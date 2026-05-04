@@ -5,9 +5,11 @@ import {
   ChevronDown,
   ChevronRight,
   CircleDot,
+  Copy,
   Download,
   Minus,
   Plus,
+  RotateCcw,
   Search,
   Settings,
   Share2,
@@ -16,6 +18,17 @@ import {
   Trophy,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +41,12 @@ import {
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  buildTxtExportByKind,
+  getExportMeta,
+  stickerExportOptions,
+  type ExportKind,
+} from "@/lib/export";
 import { cn } from "@/lib/utils";
 import {
   getGroupedStickers,
@@ -59,6 +78,7 @@ const albumTabs: { id: AlbumTab; label: string }[] = [
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [statsOpen, setStatsOpen] = React.useState(false);
+  const [shareOpen, setShareOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<AlbumTab>("all");
   const [sortMode, setSortMode] = React.useState<SortMode>("grouped");
   const [shareState, setShareState] = React.useState<
@@ -110,43 +130,12 @@ export function StickerOSApp() {
     );
   }, [sortMode, visibleStickers]);
 
-  const exportText = React.useMemo(
-    () => buildMissingTxtExport(collectionName, collectionByStickerId),
-    [collectionByStickerId, collectionName],
-  );
-
-  const shareMissing = async () => {
-    const fileName = "stickeros-missing-list.txt";
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "StickerOS missing list",
-          text: exportText,
-        });
-        return;
-      } catch {
-        // Continue to clipboard fallback when sharing is cancelled or unsupported.
-      }
-    }
-
-    try {
-      await navigator.clipboard?.writeText(exportText);
-      setShareState("copied");
-    } catch {
-      downloadText(fileName, exportText);
-      setShareState("downloaded");
-    }
-
-    window.setTimeout(() => setShareState("idle"), 1400);
-  };
-
   return (
     <main className="min-h-dvh bg-background text-foreground">
       <TopBar
         collectionName={collectionName}
         shareState={shareState}
-        onShare={shareMissing}
+        onShare={() => setShareOpen(true)}
         onSettings={() => setSettingsOpen(true)}
       />
       <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-[4.75rem] sm:px-6 lg:px-8">
@@ -193,7 +182,15 @@ export function StickerOSApp() {
       <SettingsDrawer
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        exportText={exportText}
+        collectionName={collectionName}
+        collectionByStickerId={collectionByStickerId}
+      />
+      <ShareDrawer
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        collectionName={collectionName}
+        collectionByStickerId={collectionByStickerId}
+        onShareStateChange={setShareState}
       />
       <StatsDrawer open={statsOpen} onOpenChange={setStatsOpen} />
     </main>
@@ -224,7 +221,7 @@ function TopBar({
             size="icon"
             className="size-10 rounded-md shadow-none"
             onClick={onShare}
-            aria-label="Share missing list"
+            aria-label="Open share options"
           >
             <Share2 className="size-5" />
           </Button>
@@ -620,15 +617,25 @@ function DuplicateEditor({
 function SettingsDrawer({
   open,
   onOpenChange,
-  exportText,
+  collectionName,
+  collectionByStickerId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  exportText: string;
+  collectionName: string;
+  collectionByStickerId: Record<string, number>;
 }) {
   const { setTheme } = useTheme();
+  const [exportKind, setExportKind] = React.useState<ExportKind>("both");
   const settings = useStickerStore((state) => state.settings);
   const updateSetting = useStickerStore((state) => state.updateSetting);
+  const resetCollection = useStickerStore((state) => state.resetCollection);
+  const exportText = React.useMemo(
+    () =>
+      buildTxtExportByKind(exportKind, collectionName, collectionByStickerId),
+    [collectionByStickerId, collectionName, exportKind],
+  );
+  const exportMeta = getExportMeta(exportKind);
 
   const updateTheme = (theme: ThemePreference) => {
     updateSetting("theme", theme);
@@ -677,29 +684,223 @@ function SettingsDrawer({
               onChange={(checked) => updateSetting("animations", checked)}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2 border-t pt-4">
+          <div className="space-y-3 border-t pt-4">
+            <div>
+              <p className="mb-2 text-sm font-medium">Export</p>
+              <ExportTypeSelector value={exportKind} onChange={setExportKind} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                size="pill"
+                className="shadow-none"
+                onClick={async () => {
+                  const copied = await copyText(exportText);
+                  if (!copied) downloadText(exportMeta.fileName, exportText);
+                }}
+              >
+                <Copy className="size-4" />
+                Copy TXT
+              </Button>
+              <Button
+                size="pill"
+                className="shadow-none"
+                onClick={() => downloadText(exportMeta.fileName, exportText)}
+              >
+                <Download className="size-4" />
+                Download
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-3 border-t pt-4">
+            <div>
+              <p className="text-sm font-medium">Collection Reset</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Clear all local sticker progress and duplicate counts.
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="pill"
+                  className="w-full border-destructive/40 text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <RotateCcw className="size-4" />
+                  Reset Album
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset Album?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove all your collection progress
+                    and duplicate counts from this device.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel asChild>
+                    <Button variant="secondary" className="shadow-none">
+                      Cancel
+                    </Button>
+                  </AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="destructive"
+                      className="shadow-none"
+                      onClick={resetCollection}
+                    >
+                      Reset Album
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+function ShareDrawer({
+  open,
+  onOpenChange,
+  collectionName,
+  collectionByStickerId,
+  onShareStateChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  collectionName: string;
+  collectionByStickerId: Record<string, number>;
+  onShareStateChange: (state: "idle" | "copied" | "downloaded") => void;
+}) {
+  const [exportKind, setExportKind] = React.useState<ExportKind>("missing");
+  const exportText = React.useMemo(
+    () =>
+      buildTxtExportByKind(exportKind, collectionName, collectionByStickerId),
+    [collectionByStickerId, collectionName, exportKind],
+  );
+  const exportMeta = getExportMeta(exportKind);
+
+  const announceShareState = React.useCallback(
+    (state: "copied" | "downloaded") => {
+      onShareStateChange(state);
+      window.setTimeout(() => onShareStateChange("idle"), 1400);
+    },
+    [onShareStateChange],
+  );
+
+  const shareExport = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: exportMeta.shareTitle,
+          text: exportText,
+        });
+        onOpenChange(false);
+        return;
+      } catch {
+        // Fall back to local export actions.
+      }
+    }
+
+    const copied = await copyText(exportText);
+    if (copied) {
+      announceShareState("copied");
+    } else {
+      downloadText(exportMeta.fileName, exportText);
+      announceShareState("downloaded");
+    }
+    onOpenChange(false);
+  };
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <div className="space-y-5 px-5 pb-5 pt-4">
+          <div>
+            <DrawerTitle className="text-lg font-semibold">
+              What do you want to share?
+            </DrawerTitle>
+            <DrawerDescription className="mt-1 text-sm text-muted-foreground">
+              Choose a list, then share or save it as TXT.
+            </DrawerDescription>
+          </div>
+
+          <ExportTypeSelector value={exportKind} onChange={setExportKind} />
+
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              size="pill"
+              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-md px-2 py-2 text-xs shadow-none"
+              onClick={shareExport}
+            >
+              <Share2 className="size-4" />
+              Share
+            </Button>
             <Button
               variant="secondary"
               size="pill"
-              className="shadow-none"
-              onClick={() => copyText(exportText)}
+              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-md px-2 py-2 text-xs shadow-none"
+              onClick={async () => {
+                const copied = await copyText(exportText);
+                if (copied) {
+                  announceShareState("copied");
+                } else {
+                  downloadText(exportMeta.fileName, exportText);
+                  announceShareState("downloaded");
+                }
+              }}
             >
+              <Copy className="size-4" />
               Copy TXT
             </Button>
             <Button
+              variant="secondary"
               size="pill"
-              className="shadow-none"
-              onClick={() =>
-                downloadText("stickeros-missing-list.txt", exportText)
-              }
+              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-md px-2 py-2 text-xs shadow-none"
+              onClick={() => {
+                downloadText(exportMeta.fileName, exportText);
+                announceShareState("downloaded");
+              }}
             >
               <Download className="size-4" />
-              Download
+              Download TXT
             </Button>
           </div>
         </div>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+function ExportTypeSelector({
+  value,
+  onChange,
+}: {
+  value: ExportKind;
+  onChange: (value: ExportKind) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {stickerExportOptions.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => onChange(option.id)}
+          className={cn(
+            "min-h-11 rounded-md border px-2 text-sm font-medium transition-colors",
+            value === option.id
+              ? "border-primary/45 bg-primary/10 text-primary"
+              : "bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -1013,36 +1214,13 @@ function percentage(value: number, total: number) {
   return Math.round((value / total) * 100);
 }
 
-function buildMissingTxtExport(
-  collectionName: string,
-  collectionByStickerId: Record<string, number>,
-) {
-  const sections = stickerGroups
-    .map((group) => {
-      const missing = stickers
-        .filter(
-          (sticker) =>
-            sticker.groupId === group.id &&
-            getStickerCopies(collectionByStickerId, sticker.id) === 0,
-        )
-        .map((sticker) => sticker.number);
-
-      if (missing.length === 0) return null;
-      return `${group.exportLabel}: ${missing.join(", ")}`;
-    })
-    .filter(Boolean);
-
-  return [
-    "Figuritas App - Lista",
-    collectionName,
-    "Me faltan",
-    "",
-    ...sections,
-  ].join("\n");
-}
-
 async function copyText(text: string) {
-  await navigator.clipboard?.writeText(text);
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function downloadText(fileName: string, text: string) {
