@@ -9,6 +9,7 @@ import {
   Download,
   Minus,
   Plus,
+  Repeat2,
   RotateCcw,
   Search,
   Settings,
@@ -64,6 +65,7 @@ import {
 } from "@/lib/store";
 import { StickerCard } from "./sticker-card";
 import { DataGrid } from "./data-grid";
+import { TradeDrawer } from "./trade-drawer";
 
 type AlbumTab = "all" | "missing" | "duplicates" | "special";
 type SortMode = "grouped" | "az";
@@ -81,6 +83,7 @@ export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [statsOpen, setStatsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
+  const [tradeOpen, setTradeOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<AlbumTab>("all");
   const [sortMode, setSortMode] = React.useState<SortMode>("grouped");
   const [shareState, setShareState] = React.useState<
@@ -138,6 +141,7 @@ export function StickerOSApp() {
         collectionName={collectionName}
         shareState={shareState}
         onShare={() => setShareOpen(true)}
+        onTrade={() => setTradeOpen(true)}
         onSettings={() => setSettingsOpen(true)}
       />
       <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-[4.75rem] sm:px-6 lg:px-8">
@@ -193,6 +197,7 @@ export function StickerOSApp() {
         collectionByStickerId={collectionByStickerId}
         onShareStateChange={setShareState}
       />
+      <TradeDrawer open={tradeOpen} onOpenChange={setTradeOpen} />
       <StatsDrawer open={statsOpen} onOpenChange={setStatsOpen} />
     </main>
   );
@@ -202,11 +207,13 @@ function TopBar({
   collectionName,
   shareState,
   onShare,
+  onTrade,
   onSettings,
 }: {
   collectionName: string;
   shareState: "idle" | "copied" | "downloaded";
   onShare: () => void;
+  onTrade: () => void;
   onSettings: () => void;
 }) {
   return (
@@ -225,6 +232,15 @@ function TopBar({
             aria-label="Open share options"
           >
             <Share2 className="size-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10 rounded-sm shadow-none"
+            onClick={onTrade}
+            aria-label="Open sticker trade"
+          >
+            <Repeat2 className="size-5" />
           </Button>
           <Button
             variant="ghost"

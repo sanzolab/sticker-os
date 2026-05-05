@@ -59,9 +59,9 @@ export const StickerCard = memo(function StickerCard({
           animations && "active:scale-[0.97]",
           state === "missing" &&
             "border-dashed border-border/70 bg-background text-muted-foreground/70",
-          state === "owned" && "border-primary/25 bg-primary/[0.08]",
-          state === "duplicate" && "border-primary/30 bg-primary/10",
-          state === "special" && "border-primary/25 bg-primary/[0.08]",
+          state === "owned" && "border-primary/25 bg-primary/20",
+          state === "duplicate" && "border-primary/30 bg-primary/25",
+          state === "special" && "border-primary/25 bg-primary/20",
         )}
       >
         {sticker.special && (

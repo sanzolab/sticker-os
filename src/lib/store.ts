@@ -4,6 +4,11 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { starterCollection, stickerGroups, stickers } from "@/lib/sticker-data";
+import {
+  applyTradeToCollection,
+  canApplyTrade,
+  type ApplyTradeResult,
+} from "@/lib/trade";
 
 export type ThemePreference = "system" | "light" | "dark";
 
@@ -49,6 +54,7 @@ type StickerOSState = {
   tapSticker: (id: string) => void;
   removeSticker: (id: string) => void;
   setStickerCopies: (id: string, copies: number) => void;
+  applyTrade: (receiveIds: string[], giveIds: string[]) => ApplyTradeResult;
   resetCollection: () => void;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
 };
@@ -88,6 +94,30 @@ export const useStickerStore = create<StickerOSState>()(
           else next[id] = copies;
           return { collectionByStickerId: next };
         }),
+
+      applyTrade: (receiveIds, giveIds) => {
+        let result: ApplyTradeResult = { ok: false, reason: "invalid-selection" };
+
+        set((state) => {
+          result = canApplyTrade(
+            state.collectionByStickerId,
+            receiveIds,
+            giveIds,
+          );
+
+          if (!result.ok) return state;
+
+          return {
+            collectionByStickerId: applyTradeToCollection(
+              state.collectionByStickerId,
+              receiveIds,
+              giveIds,
+            ),
+          };
+        });
+
+        return result;
+      },
 
       resetCollection: () => set({ collectionByStickerId: {} }),
 
