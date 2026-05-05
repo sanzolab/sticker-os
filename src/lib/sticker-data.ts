@@ -538,18 +538,7 @@ export const stickersById = Object.fromEntries(
   stickers.map((sticker) => [sticker.id, sticker]),
 );
 
-export const starterCollection: Record<string, number> = {
-  "fwc-trophy-00": 1,
-  "fwc-trophy-1": 2,
-  "fwc-world-5": 1,
-  ARG1: 1,
-  ARG13: 2,
-  ARG20: 1,
-  COL7: 1,
-  MEX1: 1,
-  MEX13: 3,
-  BRA10: 1,
-};
+export const starterCollection: Record<string, number> = {};
 
 export function getStickerCopies(
   collectionByStickerId: Record<string, number>,

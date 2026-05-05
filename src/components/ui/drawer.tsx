@@ -8,7 +8,10 @@ const Drawer = ({
   shouldScaleBackground = false,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
+  <DrawerPrimitive.Root
+    shouldScaleBackground={shouldScaleBackground}
+    {...props}
+  />
 );
 
 const DrawerTrigger = DrawerPrimitive.Trigger;
@@ -38,7 +41,7 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mx-auto mt-24 flex max-h-[92dvh] max-w-2xl flex-col rounded-t-xl border bg-card outline-none safe-bottom",
+        "fixed inset-x-0 bottom-0 z-50 mx-auto mt-24 flex max-h-[92dvh] max-w-2xl flex-col rounded-t-sm border bg-card outline-none safe-bottom",
         className,
       )}
       {...props}
@@ -50,4 +53,11 @@ const DrawerContent = React.forwardRef<
 ));
 DrawerContent.displayName = "DrawerContent";
 
-export { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger };
+export {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+  DrawerTrigger,
+};

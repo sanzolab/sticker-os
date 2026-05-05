@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  getStickerCopies,
-  stickerGroups,
-  stickers,
-} from "@/lib/sticker-data";
+import { getStickerCopies, stickerGroups, stickers } from "@/lib/sticker-data";
 
 type CollectionByStickerId = Record<string, number>;
 
@@ -15,12 +11,12 @@ const exportOptions: Record<
   { label: string; fileName: string; shareTitle: string }
 > = {
   missing: {
-    label: "Missing Stickers",
+    label: "Missing",
     fileName: "stickeros-missing-list.txt",
     shareTitle: "StickerOS missing list",
   },
   duplicates: {
-    label: "Duplicate Stickers",
+    label: "Duplicate",
     fileName: "stickeros-duplicate-list.txt",
     shareTitle: "StickerOS duplicate list",
   },
@@ -32,7 +28,10 @@ const exportOptions: Record<
 };
 
 export const stickerExportOptions = (
-  Object.entries(exportOptions) as [ExportKind, (typeof exportOptions)[ExportKind]][]
+  Object.entries(exportOptions) as [
+    ExportKind,
+    (typeof exportOptions)[ExportKind],
+  ][]
 ).map(([id, option]) => ({ id, ...option }));
 
 export function getExportMeta(kind: ExportKind) {

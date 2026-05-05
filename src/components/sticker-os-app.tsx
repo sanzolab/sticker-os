@@ -62,6 +62,8 @@ import {
   useCollectionStats,
   useStickerStore,
 } from "@/lib/store";
+import { StickerCard } from "./sticker-card";
+import { DataGrid } from "./data-grid";
 
 type AlbumTab = "all" | "missing" | "duplicates" | "special";
 type SortMode = "grouped" | "az";
@@ -139,7 +141,7 @@ export function StickerOSApp() {
         onSettings={() => setSettingsOpen(true)}
       />
       <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-[4.75rem] sm:px-6 lg:px-8">
-        <section className="mb-8  border rounded-md divide-y">
+        <section className="mb-8  border rounded-sm divide-y">
           <CollectionHeader
             stats={stats}
             onViewMore={() => setStatsOpen(true)}
@@ -163,7 +165,6 @@ export function StickerOSApp() {
               key={group.id}
               group={group}
               stickers={groupStickers}
-              collectionByStickerId={collectionByStickerId}
             />
           ))}
           {grouped.length === 0 && (
@@ -211,7 +212,7 @@ function TopBar({
   return (
     <header className="fixed inset-x-0 top-0 z-40  bg-background">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <button className="inline-flex items-center gap-1 rounded-md px-0.5 py-2 text-xl font-semibold tracking-normal transition-transform active:scale-[0.99] sm:text-2xl">
+        <button className="inline-flex items-center gap-1 rounded-sm px-0.5 py-2 text-xl font-semibold tracking-normal transition-transform active:scale-[0.99] sm:text-2xl">
           {collectionName}
           {/* <ChevronDown className="mt-0.5 size-5 text-muted-foreground" /> */}
         </button>
@@ -219,7 +220,7 @@ function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            className="size-10 rounded-md shadow-none"
+            className="size-10 rounded-sm shadow-none"
             onClick={onShare}
             aria-label="Open share options"
           >
@@ -228,7 +229,7 @@ function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            className="size-10 rounded-md shadow-none"
+            className="size-10 rounded-sm shadow-none"
             onClick={onSettings}
             aria-label="Open settings"
           >
@@ -237,7 +238,7 @@ function TopBar({
         </div>
       </div>
       {shareState !== "idle" && (
-        <div className="absolute right-14 top-12 rounded-md border bg-card px-2.5 py-1 text-xs text-muted-foreground">
+        <div className="absolute right-14 top-12 rounded-sm border bg-card px-2.5 py-1 text-xs text-muted-foreground">
           {shareState === "copied" ? "Copied" : "Downloaded"}
         </div>
       )}
@@ -345,26 +346,31 @@ function StickyControls({
 }) {
   return (
     <section className="sticky top-14 z-30 -mx-4  bg-background px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="grid grid-cols-4">
+      <div className="relative grid grid-cols-4">
         {albumTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => onTabChange(tab.id)}
             className={cn(
-              "relative h-12 text-sm font-medium text-muted-foreground transition-colors",
+              "h-12 text-sm font-medium text-muted-foreground transition-colors",
               activeTab === tab.id && "text-primary",
             )}
           >
             {tab.label}
-            <span
-              className={cn(
-                "absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary opacity-0 transition-opacity",
-                activeTab === tab.id && "opacity-100",
-              )}
-            />
           </button>
         ))}
+
+        {/* indicador tipo imán */}
+        <span
+          className="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-out"
+          style={{
+            width: `${100 / albumTabs.length}%`,
+            transform: `translateX(${
+              albumTabs.findIndex((t) => t.id === activeTab) * 100
+            }%)`,
+          }}
+        />
       </div>
       <div className="mt-3 grid grid-cols-[1fr_3.5rem] gap-3">
         <div className="relative">
@@ -397,26 +403,30 @@ function StickyControls({
     </section>
   );
 }
-
-function StickerSection({
+const StickerSection = React.memo(function StickerSection({
   group,
   stickers: groupStickers,
-  collectionByStickerId,
 }: {
   group: StickerGroup;
   stickers: Sticker[];
-  collectionByStickerId: Record<string, number>;
 }) {
-  const [open, setOpen] = React.useState(true);
-  const missing = groupStickers.filter(
-    (sticker) => getStickerCopies(collectionByStickerId, sticker.id) === 0,
-  ).length;
-  const duplicates = groupStickers.reduce(
-    (sum, sticker) =>
-      sum +
-      Math.max(getStickerCopies(collectionByStickerId, sticker.id) - 1, 0),
-    0,
+  const collectionByStickerId = useStickerStore(
+    (state) => state.collectionByStickerId,
   );
+
+  const [open, setOpen] = React.useState(true);
+
+  const missing = React.useMemo(() => {
+    return groupStickers.filter((s) => (collectionByStickerId[s.id] ?? 0) === 0)
+      .length;
+  }, [groupStickers, collectionByStickerId]);
+
+  const duplicates = React.useMemo(() => {
+    return groupStickers.reduce(
+      (sum, s) => sum + Math.max((collectionByStickerId[s.id] ?? 0) - 1, 0),
+      0,
+    );
+  }, [groupStickers, collectionByStickerId]);
 
   return (
     <section>
@@ -441,6 +451,16 @@ function StickerSection({
           )}
         />
       </button>
+
+      {/* {open && (
+        // <div className="min-h-0">
+        //           <div className="grid grid-cols-4 gap-3 py-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+        //             {groupStickers.map((sticker) => (
+        //               <StickerCard key={sticker.id} sticker={sticker} />
+        //             ))}
+        //           </div>
+        //         </div>
+        //       </div> */}
       <div
         className={cn(
           "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
@@ -448,171 +468,232 @@ function StickerSection({
         )}
       >
         <div className="min-h-0">
-          <div className="grid grid-cols-4 gap-3 py-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+          <div className="grid grid-cols-4 gap-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 py-3">
             {groupStickers.map((sticker) => (
               <StickerCard key={sticker.id} sticker={sticker} />
             ))}
           </div>
         </div>
       </div>
+      {/* )} */}
     </section>
   );
-}
+});
+// function StickerSection({
+//   group,
+//   stickers: groupStickers,
+//   collectionByStickerId,
+// }: {
+//   group: StickerGroup;
+//   stickers: Sticker[];
+//   collectionByStickerId: Record<string, number>;
+// }) {
+//   const [open, setOpen] = React.useState(true);
+//   const missing = groupStickers.filter(
+//     (sticker) => getStickerCopies(collectionByStickerId, sticker.id) === 0,
+//   ).length;
+//   const duplicates = groupStickers.reduce(
+//     (sum, sticker) =>
+//       sum +
+//       Math.max(getStickerCopies(collectionByStickerId, sticker.id) - 1, 0),
+//     0,
+//   );
 
-function StickerCard({ sticker }: { sticker: Sticker }) {
-  const collectionByStickerId = useStickerStore(
-    (state) => state.collectionByStickerId,
-  );
-  const tapSticker = useStickerStore((state) => state.tapSticker);
-  const removeSticker = useStickerStore((state) => state.removeSticker);
-  const animations = useStickerStore((state) => state.settings.animations);
-  const [editorOpen, setEditorOpen] = React.useState(false);
-  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const longPressed = React.useRef(false);
-  const copies = getStickerCopies(collectionByStickerId, sticker.id);
-  const state = getVisualState(collectionByStickerId, sticker);
+//   return (
+//     <section>
+//       <button
+//         type="button"
+//         onClick={() => setOpen(!open)}
+//         className="flex w-full items-center justify-between gap-3 py-2 text-left"
+//       >
+//         <div>
+//           <h2 className="text-lg font-semibold tracking-normal">
+//             {group.label}
+//           </h2>
+//           <p className="mt-0.5 text-xs text-muted-foreground">
+//             {missing} missing
+//             {duplicates > 0 ? ` · ${duplicates} duplicates` : ""}
+//           </p>
+//         </div>
+//         <ChevronDown
+//           className={cn(
+//             "size-5 text-muted-foreground transition-transform duration-200",
+//             !open && "-rotate-90",
+//           )}
+//         />
+//       </button>
+//       <div
+//         className={cn(
+//           "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
+//           open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+//         )}
+//       >
+//         <div className="min-h-0">
+//           <div className="grid grid-cols-4 gap-3 py-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+//             {groupStickers.map((sticker) => (
+//               <StickerCard key={sticker.id} sticker={sticker} />
+//             ))}
+//           </div>
+//         </div>
+//       </div>
+//     </section>
+//   );
+// }
 
-  const beginPress = () => {
-    longPressed.current = false;
-    longPressTimer.current = setTimeout(() => {
-      longPressed.current = true;
-      if (copies === 1) removeSticker(sticker.id);
-      if (copies > 1) setEditorOpen(true);
-    }, 450);
-  };
+// function StickerCard({ sticker }: { sticker: Sticker }) {
+//   const collectionByStickerId = useStickerStore(
+//     (state) => state.collectionByStickerId,
+//   );
+//   const tapSticker = useStickerStore((state) => state.tapSticker);
+//   const removeSticker = useStickerStore((state) => state.removeSticker);
+//   const animations = useStickerStore((state) => state.settings.animations);
+//   const [editorOpen, setEditorOpen] = React.useState(false);
+//   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
+//     null,
+//   );
+//   const longPressed = React.useRef(false);
+//   const copies = getStickerCopies(collectionByStickerId, sticker.id);
+//   const state = getVisualState(collectionByStickerId, sticker);
 
-  const endPress = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
-  };
+//   const beginPress = () => {
+//     longPressed.current = false;
+//     longPressTimer.current = setTimeout(() => {
+//       longPressed.current = true;
+//       if (copies === 1) removeSticker(sticker.id);
+//       if (copies > 1) setEditorOpen(true);
+//     }, 450);
+//   };
 
-  const handleClick = () => {
-    if (longPressed.current) return;
-    tapSticker(sticker.id);
-  };
+//   const endPress = () => {
+//     if (longPressTimer.current) clearTimeout(longPressTimer.current);
+//   };
 
-  return (
-    <>
-      <button
-        type="button"
-        onPointerDown={beginPress}
-        onPointerUp={endPress}
-        onPointerCancel={endPress}
-        onPointerLeave={endPress}
-        onClick={handleClick}
-        className={cn(
-          "relative flex aspect-[3/4.35] select-none items-center justify-center rounded-md border text-2xl font-medium tracking-normal",
-          "transition-[background-color,border-color,color,transform] duration-150 ease-out",
-          animations && "active:scale-[0.97]",
-          state === "missing" &&
-            "border-dashed border-border/70 bg-background text-muted-foreground/70",
-          state === "owned" &&
-            "border-primary/25 bg-primary/[0.08] text-foreground",
-          state === "duplicate" &&
-            "border-primary/30 bg-primary/10 text-foreground",
-          state === "special" &&
-            "border-primary/25 bg-primary/[0.08] text-foreground",
-        )}
-        aria-label={`${sticker.code}, ${copies} copies`}
-      >
-        {sticker.special && (
-          <span className="absolute right-3 top-3 text-sm leading-none text-yellow-400">
-            ✨
-          </span>
-        )}
-        <span>{sticker.number}</span>
-        {state === "missing" && (
-          <span className="absolute bottom-5 size-2 rounded-full border border-muted-foreground/60" />
-        )}
-        {copies > 1 && (
-          <span className="absolute bottom-4 right-3 rounded-full border bg-background px-1.5 py-0.5 text-xs font-semibold leading-none text-foreground">
-            x{copies - 1}
-          </span>
-        )}
-      </button>
-      <DuplicateEditor
-        sticker={sticker}
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-      />
-    </>
-  );
-}
+//   const handleClick = () => {
+//     if (longPressed.current) return;
+//     tapSticker(sticker.id);
+//   };
 
-function DuplicateEditor({
-  sticker,
-  open,
-  onOpenChange,
-}: {
-  sticker: Sticker;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const copies = useStickerStore(
-    (state) => state.collectionByStickerId[sticker.id] ?? 0,
-  );
-  const setStickerCopies = useStickerStore((state) => state.setStickerCopies);
-  const [draft, setDraft] = React.useState<number | null>(null);
-  const duplicateDraft = draft ?? Math.max(copies - 1, 0);
+//   return (
+//     <>
+//       <button
+//         type="button"
+//         onPointerDown={beginPress}
+//         onPointerUp={endPress}
+//         onPointerCancel={endPress}
+//         onPointerLeave={endPress}
+//         onClick={handleClick}
+//         className={cn(
+//           "relative flex aspect-[3/4.35] select-none items-center justify-center rounded-sm border text-2xl font-medium tracking-normal",
+//           "transition-[background-color,border-color,color,transform] duration-150 ease-out",
+//           animations && "active:scale-[0.97]",
+//           state === "missing" &&
+//             "border-dashed border-border/70 bg-background text-muted-foreground/70",
+//           state === "owned" &&
+//             "border-primary/25 bg-primary/[0.08] text-foreground",
+//           state === "duplicate" &&
+//             "border-primary/30 bg-primary/10 text-foreground",
+//           state === "special" &&
+//             "border-primary/25 bg-primary/[0.08] text-foreground",
+//         )}
+//         aria-label={`${sticker.code}, ${copies} copies`}
+//       >
+//         {sticker.special && (
+//           <span className="absolute right-3 top-3 text-sm leading-none text-yellow-400">
+//             ✨
+//           </span>
+//         )}
+//         <span>{sticker.number}</span>
+//         {state === "missing" && (
+//           <span className="absolute bottom-5 size-2 rounded-full border border-muted-foreground/60" />
+//         )}
+//         {copies > 1 && (
+//           <span className="absolute bottom-4 right-3 rounded-full border bg-background px-1.5 py-0.5 text-xs font-semibold leading-none text-foreground">
+//             x{copies - 1}
+//           </span>
+//         )}
+//       </button>
+//       <DuplicateEditor
+//         sticker={sticker}
+//         open={editorOpen}
+//         onOpenChange={setEditorOpen}
+//       />
+//     </>
+//   );
+// }
 
-  return (
-    <Drawer
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) setDraft(null);
-        onOpenChange(nextOpen);
-      }}
-    >
-      <DrawerContent>
-        <div className="px-5 pb-5 pt-4 text-center">
-          <Badge variant="secondary" className="mb-3 rounded-md">
-            {sticker.code}
-          </Badge>
-          <DrawerTitle className="text-lg font-semibold">
-            Edit duplicates
-          </DrawerTitle>
-          <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-            Set extra copies for {sticker.groupLabel}.
-          </DrawerDescription>
-          <div className="mx-auto my-6 flex items-center justify-center gap-4">
-            <Button
-              size="icon"
-              variant="secondary"
-              className="rounded-full shadow-none"
-              onClick={() =>
-                setDraft((value) => Math.max((value ?? duplicateDraft) - 1, 0))
-              }
-              aria-label="Decrease duplicates"
-            >
-              <Minus className="size-4" />
-            </Button>
-            <div className="min-w-14 text-3xl font-semibold">
-              {duplicateDraft}
-            </div>
-            <Button
-              size="icon"
-              className="rounded-full shadow-none"
-              onClick={() => setDraft((value) => (value ?? duplicateDraft) + 1)}
-              aria-label="Increase duplicates"
-            >
-              <Plus className="size-4" />
-            </Button>
-          </div>
-          <DrawerClose asChild>
-            <Button
-              size="pill"
-              className="w-full"
-              onClick={() => setStickerCopies(sticker.id, duplicateDraft + 1)}
-            >
-              Confirm
-            </Button>
-          </DrawerClose>
-        </div>
-      </DrawerContent>
-    </Drawer>
-  );
-}
+// function DuplicateEditor({
+//   sticker,
+//   open,
+//   onOpenChange,
+// }: {
+//   sticker: Sticker;
+//   open: boolean;
+//   onOpenChange: (open: boolean) => void;
+// }) {
+//   const copies = useStickerStore(
+//     (state) => state.collectionByStickerId[sticker.id] ?? 0,
+//   );
+//   const setStickerCopies = useStickerStore((state) => state.setStickerCopies);
+//   const [draft, setDraft] = React.useState<number | null>(null);
+//   const duplicateDraft = draft ?? Math.max(copies - 1, 0);
+
+//   return (
+//     <Drawer
+//       open={open}
+//       onOpenChange={(nextOpen) => {
+//         if (!nextOpen) setDraft(null);
+//         onOpenChange(nextOpen);
+//       }}
+//     >
+//       <DrawerContent>
+//         <div className="px-5 pb-5 pt-4 text-center">
+//           <Badge variant="secondary" className="mb-3 rounded-sm">
+//             {sticker.code}
+//           </Badge>
+//           <DrawerTitle className="text-lg font-semibold">
+//             Edit duplicates
+//           </DrawerTitle>
+//           <DrawerDescription className="mt-1 text-sm text-muted-foreground">
+//             Set extra copies for {sticker.groupLabel}.
+//           </DrawerDescription>
+//           <div className="mx-auto my-6 flex items-center justify-center gap-4">
+//             <Button
+//               size="icon"
+//               variant="secondary"
+//               className="rounded-full shadow-none"
+//               onClick={() =>
+//                 setDraft((value) => Math.max((value ?? duplicateDraft) - 1, 0))
+//               }
+//               aria-label="Decrease duplicates"
+//             >
+//               <Minus className="size-4" />
+//             </Button>
+//             <div className="min-w-14 text-3xl font-semibold">
+//               {duplicateDraft}
+//             </div>
+//             <Button
+//               size="icon"
+//               className="rounded-full shadow-none"
+//               onClick={() => setDraft((value) => (value ?? duplicateDraft) + 1)}
+//               aria-label="Increase duplicates"
+//             >
+//               <Plus className="size-4" />
+//             </Button>
+//           </div>
+//           <DrawerClose asChild>
+//             <Button
+//               size="pill"
+//               className="w-full"
+//               onClick={() => setStickerCopies(sticker.id, duplicateDraft + 1)}
+//             >
+//               Confirm
+//             </Button>
+//           </DrawerClose>
+//         </div>
+//       </DrawerContent>
+//     </Drawer>
+//   );
+// }
 
 function SettingsDrawer({
   open,
@@ -661,7 +742,7 @@ function SettingsDrawer({
                 type="button"
                 onClick={() => updateTheme(theme)}
                 className={cn(
-                  "h-10 rounded-md border text-sm font-medium capitalize transition-colors",
+                  "h-10 rounded-sm border text-sm font-medium capitalize transition-colors",
                   settings.theme === theme &&
                     "border-primary/40 bg-primary/10 text-primary",
                 )}
@@ -825,7 +906,7 @@ function ShareDrawer({
               What do you want to share?
             </DrawerTitle>
             <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-              Choose a list, then share or save it as TXT.
+              Choose a list of stickers, then share or save it as TXT.
             </DrawerDescription>
           </div>
 
@@ -834,7 +915,7 @@ function ShareDrawer({
           <div className="grid grid-cols-3 gap-2">
             <Button
               size="pill"
-              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-md px-2 py-2 text-xs shadow-none"
+              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-sm px-2 py-2 text-xs shadow-none"
               onClick={shareExport}
             >
               <Share2 className="size-4" />
@@ -843,7 +924,7 @@ function ShareDrawer({
             <Button
               variant="secondary"
               size="pill"
-              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-md px-2 py-2 text-xs shadow-none"
+              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-sm px-2 py-2 text-xs shadow-none"
               onClick={async () => {
                 const copied = await copyText(exportText);
                 if (copied) {
@@ -860,7 +941,7 @@ function ShareDrawer({
             <Button
               variant="secondary"
               size="pill"
-              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-md px-2 py-2 text-xs shadow-none"
+              className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-sm px-2 py-2 text-xs shadow-none"
               onClick={() => {
                 downloadText(exportMeta.fileName, exportText);
                 announceShareState("downloaded");
@@ -891,7 +972,7 @@ function ExportTypeSelector({
           type="button"
           onClick={() => onChange(option.id)}
           className={cn(
-            "min-h-11 rounded-md border px-2 text-sm font-medium transition-colors",
+            "min-h-11 rounded-sm border px-2 text-sm font-medium transition-colors",
             value === option.id
               ? "border-primary/45 bg-primary/10 text-primary"
               : "bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground",
@@ -902,6 +983,31 @@ function ExportTypeSelector({
       ))}
     </div>
   );
+}
+
+function mapStatsToItems(stats: ReturnType<typeof useCollectionStats>) {
+  return [
+    { label: "Ratio", value: `${stats.collected}/${stats.total}` },
+    { label: "Percent", value: `${stats.completion}%` },
+    { label: "Total", value: stats.total },
+
+    { label: "Collected", value: stats.collected },
+    { label: "Missing", value: stats.missing },
+    { label: "Duplicates", value: stats.duplicateCopies },
+
+    {
+      label: "Special",
+      value: `${stats.specialCollected}/${stats.specialTotal}`,
+    },
+    {
+      label: "Teams",
+      value: `${stats.teamCollected}/${stats.teamTotal}`,
+    },
+    {
+      label: "Shields",
+      value: `${stats.shieldCollected}/${stats.shieldTotal}`,
+    },
+  ];
 }
 
 function StatsDrawer({
@@ -917,6 +1023,8 @@ function StatsDrawer({
     (state) => state.collectionByStickerId,
   );
   const stats = useCollectionStats();
+  const items = mapStatsToItems(stats);
+
   const teamProgress = React.useMemo(
     () =>
       buildTeamProgress(collectionByStickerId).sort((a, b) =>
@@ -938,9 +1046,12 @@ function StatsDrawer({
             </DrawerDescription>
           </div>
 
-          <div className="grid grid-cols-[5rem_1fr] gap-4 rounded-md border p-3">
-            <ProgressRing value={stats.completion} />
-            <div className="grid grid-cols-3 gap-2 text-sm">
+          <div className="grid grid-cols-[6rem_1fr] rounded-sm border text-sm">
+            <div className="p-2 grid place-items-center  border-r">
+              <ProgressRing value={stats.completion} size="default" />
+            </div>
+            <DataGrid items={items} cols={3} />
+            {/* <div className="grid grid-cols-3 text-sm">
               <StatCell
                 label="Ratio"
                 value={`${stats.collected}/${stats.total}`}
@@ -962,7 +1073,7 @@ function StatsDrawer({
                 label="Shields"
                 value={`${stats.shieldCollected}/${stats.shieldTotal}`}
               />
-            </div>
+            </div> */}
           </div>
 
           <div className="grid grid-cols-2 border-b">
@@ -1015,7 +1126,7 @@ function StatsDrawer({
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full justify-center rounded-md shadow-none"
+                className="w-full justify-center rounded-sm shadow-none"
                 onClick={() =>
                   setTeamSort((mode) => (mode === "most" ? "least" : "most"))
                 }
@@ -1094,9 +1205,17 @@ function ProgressRing({
   );
 }
 
-function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
+function StatCell({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div>
+    <div className={cn("p-2 ", className)}>
       <p className="text-[11px] text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-semibold">{value}</p>
     </div>
