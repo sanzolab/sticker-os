@@ -1,4 +1,5 @@
-import { Sticker } from "@/lib/sticker-data";
+import { getStickerGroupLabelById, Sticker } from "@/lib/sticker-data";
+import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 import { useState } from "react";
 import {
@@ -21,16 +22,31 @@ export function DuplicateEditor({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  if (!open) return null;
+
+  return (
+    <DuplicateEditorContent sticker={sticker} onOpenChange={onOpenChange} />
+  );
+}
+
+function DuplicateEditorContent({
+  sticker,
+  onOpenChange,
+}: {
+  sticker: Sticker;
+  onOpenChange: (open: boolean) => void;
+}) {
   const copies = useStickerStore(
     (state) => state.collectionByStickerId[sticker.id] ?? 0,
   );
+  const locale = useStickerStore((state) => state.settings.locale);
   const setStickerCopies = useStickerStore((state) => state.setStickerCopies);
   const [draft, setDraft] = useState<number | null>(null);
   const duplicateDraft = draft ?? Math.max(copies - 1, 0);
 
   return (
     <Drawer
-      open={open}
+      open
       onOpenChange={(nextOpen) => {
         if (!nextOpen) setDraft(null);
         onOpenChange(nextOpen);
@@ -42,10 +58,12 @@ export function DuplicateEditor({
             {sticker.code}
           </Badge>
           <DrawerTitle className="text-lg font-semibold">
-            Edit duplicates
+            {t(locale, "duplicate.title")}
           </DrawerTitle>
           <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-            Set extra copies for {sticker.groupLabel}.
+            {t(locale, "duplicate.description", {
+              group: getStickerGroupLabelById(sticker.groupId, locale),
+            })}
           </DrawerDescription>
           <div className="mx-auto my-6 flex items-center justify-center gap-4">
             <Button
@@ -55,7 +73,7 @@ export function DuplicateEditor({
               onClick={() =>
                 setDraft((value) => Math.max((value ?? duplicateDraft) - 1, 0))
               }
-              aria-label="Decrease duplicates"
+              aria-label={t(locale, "duplicate.decrease")}
             >
               <Minus className="size-4" />
             </Button>
@@ -66,7 +84,7 @@ export function DuplicateEditor({
               size="icon"
               className="rounded-full shadow-none"
               onClick={() => setDraft((value) => (value ?? duplicateDraft) + 1)}
-              aria-label="Increase duplicates"
+              aria-label={t(locale, "duplicate.increase")}
             >
               <Plus className="size-4" />
             </Button>
@@ -77,7 +95,7 @@ export function DuplicateEditor({
               className="w-full"
               onClick={() => setStickerCopies(sticker.id, duplicateDraft + 1)}
             >
-              Confirm
+              {t(locale, "duplicate.confirm")}
             </Button>
           </DrawerClose>
         </div>

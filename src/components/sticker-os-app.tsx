@@ -7,8 +7,6 @@ import {
   CircleDot,
   Copy,
   Download,
-  Minus,
-  Plus,
   Repeat2,
   RotateCcw,
   Search,
@@ -30,12 +28,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
@@ -48,11 +44,13 @@ import {
   stickerExportOptions,
   type ExportKind,
 } from "@/lib/export";
+import { localeOptions, t, type Locale, type TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
-  getGroupedStickers,
   getStickerCopies,
-  getVisualState,
+  getStickerGroupLabel,
+  getStickerSearchValues,
+  normalizeStickerSearchText,
   stickerGroups,
   stickers,
   type Sticker,
@@ -63,6 +61,7 @@ import {
   useCollectionStats,
   useStickerStore,
 } from "@/lib/store";
+import { DuplicateEditor } from "./duplicate-editor";
 import { StickerCard } from "./sticker-card";
 import { DataGrid } from "./data-grid";
 import { TradeDrawer } from "./trade-drawer";
@@ -72,12 +71,71 @@ type SortMode = "grouped" | "az";
 type StatsTab = "summary" | "teams";
 type TeamSortMode = "most" | "least";
 
-const albumTabs: { id: AlbumTab; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "missing", label: "Missing" },
-  { id: "duplicates", label: "Duplicates" },
-  { id: "special", label: "Special" },
-];
+const albumTabs = [
+  { id: "all", labelKey: "album.tab.all" },
+  { id: "missing", labelKey: "album.tab.missing" },
+  { id: "duplicates", labelKey: "album.tab.duplicates" },
+  { id: "special", labelKey: "album.tab.special" },
+] as const satisfies readonly {
+  id: AlbumTab;
+  labelKey: TranslationKey;
+  }[];
+
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
+
+type StartViewTransitionResult = {
+  finished: Promise<unknown>;
+};
+
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (updateCallback: () => void) => StartViewTransitionResult;
+};
+
+let activeGridViewTransitions = 0;
+
+function runViewTransition(update: () => void) {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    update();
+    return;
+  }
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    update();
+    return;
+  }
+
+  const doc = document as DocumentWithViewTransition;
+  if (typeof doc.startViewTransition !== "function") {
+    update();
+    return;
+  }
+
+  const root = document.documentElement;
+  const activate = () => {
+    if (activeGridViewTransitions === 0) {
+      root.classList.add("sticker-grid-view-transition-active");
+    }
+    activeGridViewTransitions += 1;
+  };
+  const deactivate = () => {
+    activeGridViewTransitions = Math.max(0, activeGridViewTransitions - 1);
+    if (activeGridViewTransitions === 0) {
+      root.classList.remove("sticker-grid-view-transition-active");
+    }
+  };
+
+  try {
+    activate();
+    const transition = doc.startViewTransition(update);
+    void transition.finished.finally(() => {
+      deactivate();
+    });
+  } catch {
+    deactivate();
+    update();
+  }
+}
 
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
@@ -85,7 +143,10 @@ export function StickerOSApp() {
   const [shareOpen, setShareOpen] = React.useState(false);
   const [tradeOpen, setTradeOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<AlbumTab>("all");
+  const [visitedTabs, setVisitedTabs] = React.useState<AlbumTab[]>(["all"]);
   const [sortMode, setSortMode] = React.useState<SortMode>("grouped");
+  const [duplicateEditorSticker, setDuplicateEditorSticker] =
+    React.useState<Sticker | null>(null);
   const [shareState, setShareState] = React.useState<
     "idle" | "copied" | "downloaded"
   >("idle");
@@ -95,61 +156,60 @@ export function StickerOSApp() {
   );
   const query = useStickerStore((state) => state.searchQuery);
   const setQuery = useStickerStore((state) => state.setSearchQuery);
+  const locale = useStickerStore((state) => state.settings.locale);
   const stats = useCollectionStats();
+  const deferredActiveTab = React.useDeferredValue(activeTab);
 
-  const visibleStickers = React.useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+  const handleEditDuplicates = React.useCallback((sticker: Sticker) => {
+    setDuplicateEditorSticker(sticker);
+  }, []);
 
-    return stickers.filter((sticker) => {
-      const copies = getStickerCopies(collectionByStickerId, sticker.id);
-      const matchesTab =
-        activeTab === "all" ||
-        (activeTab === "missing" && copies === 0) ||
-        (activeTab === "duplicates" && copies > 1) ||
-        (activeTab === "special" && sticker.special);
-
-      if (!matchesTab) return false;
-      if (!normalized) return true;
-
-      return [
-        sticker.number,
-        sticker.code,
-        sticker.title,
-        sticker.groupLabel,
-        sticker.countryCode,
-        sticker.exportLabel,
-        sticker.kind,
-      ]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(normalized));
+  const handleDuplicateEditorOpenChange = React.useCallback((open: boolean) => {
+    if (!open) setDuplicateEditorSticker(null);
+  }, []);
+  const handleShareOpen = React.useCallback(() => {
+    setShareOpen(true);
+  }, []);
+  const handleTradeOpen = React.useCallback(() => {
+    setTradeOpen(true);
+  }, []);
+  const handleSettingsOpen = React.useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
+  const handleStatsOpen = React.useCallback(() => {
+    setStatsOpen(true);
+  }, []);
+  const handleSortToggle = React.useCallback(() => {
+    runViewTransition(() => {
+      setSortMode((mode) => (mode === "grouped" ? "az" : "grouped"));
     });
-  }, [activeTab, collectionByStickerId, query]);
+  }, []);
 
-  const grouped = React.useMemo(() => {
-    const sections = getGroupedStickers(visibleStickers);
+  const handleTabChange = React.useCallback((tab: AlbumTab) => {
+    if (tab === activeTab) return;
 
-    if (sortMode === "grouped") return sections;
+    runViewTransition(() => {
+      setVisitedTabs((tabs) =>
+        tabs.includes(tab) ? tabs : [...tabs, tab],
+      );
+      setActiveTab(tab);
+    });
+  }, [activeTab]);
 
-    return [...sections].sort((a, b) =>
-      a.group.label.localeCompare(b.group.label),
-    );
-  }, [sortMode, visibleStickers]);
+  const isGridPending = activeTab !== deferredActiveTab;
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
       <TopBar
         collectionName={collectionName}
         shareState={shareState}
-        onShare={() => setShareOpen(true)}
-        onTrade={() => setTradeOpen(true)}
-        onSettings={() => setSettingsOpen(true)}
+        onShare={handleShareOpen}
+        onTrade={handleTradeOpen}
+        onSettings={handleSettingsOpen}
       />
       <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-[4.75rem] sm:px-6 lg:px-8">
         <section className="mb-8  border rounded-sm divide-y">
-          <CollectionHeader
-            stats={stats}
-            onViewMore={() => setStatsOpen(true)}
-          />
+          <CollectionHeader stats={stats} onViewMore={handleStatsOpen} />
         </section>
 
         <StickyControls
@@ -157,32 +217,38 @@ export function StickerOSApp() {
           query={query}
           sortMode={sortMode}
           onQueryChange={setQuery}
-          onSortToggle={() =>
-            setSortMode((mode) => (mode === "grouped" ? "az" : "grouped"))
-          }
-          onTabChange={setActiveTab}
+          onSortToggle={handleSortToggle}
+          onTabChange={handleTabChange}
         />
 
-        <section className="space-y-4 pt-4">
-          {grouped.map(({ group, stickers: groupStickers }) => (
-            <StickerSection
-              key={group.id}
-              group={group}
-              stickers={groupStickers}
+        <section
+          className={cn(
+            "pt-4 transition-opacity duration-150",
+            isGridPending && "opacity-70",
+          )}
+        >
+          {visitedTabs.map((tab) => (
+            <AlbumTabPanel
+              key={tab}
+              tab={tab}
+              active={tab === deferredActiveTab}
+              collectionByStickerId={collectionByStickerId}
+              locale={locale}
+              query={query}
+              sortMode={sortMode}
+              onEditDuplicates={handleEditDuplicates}
             />
           ))}
-          {grouped.length === 0 && (
-            <Card className="shadow-none">
-              <CardContent className="flex min-h-32 flex-col items-center justify-center p-5 text-center">
-                <p className="text-sm font-medium">No stickers found</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Try a code like ARG13 or a country name.
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </section>
       </div>
+
+      {duplicateEditorSticker && (
+        <DuplicateEditor
+          sticker={duplicateEditorSticker}
+          open
+          onOpenChange={handleDuplicateEditorOpenChange}
+        />
+      )}
 
       <SettingsDrawer
         open={settingsOpen}
@@ -198,12 +264,17 @@ export function StickerOSApp() {
         onShareStateChange={setShareState}
       />
       <TradeDrawer open={tradeOpen} onOpenChange={setTradeOpen} />
-      <StatsDrawer open={statsOpen} onOpenChange={setStatsOpen} />
+      <StatsDrawer
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        collectionByStickerId={collectionByStickerId}
+        stats={stats}
+      />
     </main>
   );
 }
 
-function TopBar({
+const TopBar = React.memo(function TopBar({
   collectionName,
   shareState,
   onShare,
@@ -216,6 +287,8 @@ function TopBar({
   onTrade: () => void;
   onSettings: () => void;
 }) {
+  const locale = useStickerStore((state) => state.settings.locale);
+
   return (
     <header className="fixed inset-x-0 top-0 z-40  bg-background">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -229,7 +302,7 @@ function TopBar({
             size="icon"
             className="size-10 rounded-sm shadow-none"
             onClick={onShare}
-            aria-label="Open share options"
+            aria-label={t(locale, "topbar.shareAria")}
           >
             <Share2 className="size-5" />
           </Button>
@@ -238,7 +311,7 @@ function TopBar({
             size="icon"
             className="size-10 rounded-sm shadow-none"
             onClick={onTrade}
-            aria-label="Open sticker trade"
+            aria-label={t(locale, "topbar.tradeAria")}
           >
             <Repeat2 className="size-5" />
           </Button>
@@ -247,7 +320,7 @@ function TopBar({
             size="icon"
             className="size-10 rounded-sm shadow-none"
             onClick={onSettings}
-            aria-label="Open settings"
+            aria-label={t(locale, "topbar.settingsAria")}
           >
             <Settings className="size-5" />
           </Button>
@@ -255,20 +328,24 @@ function TopBar({
       </div>
       {shareState !== "idle" && (
         <div className="absolute right-14 top-12 rounded-sm border bg-card px-2.5 py-1 text-xs text-muted-foreground">
-          {shareState === "copied" ? "Copied" : "Downloaded"}
+          {shareState === "copied"
+            ? t(locale, "topbar.shareStatus.copied")
+            : t(locale, "topbar.shareStatus.downloaded")}
         </div>
       )}
     </header>
   );
-}
+});
 
-function CollectionHeader({
+const CollectionHeader = React.memo(function CollectionHeader({
   stats,
   onViewMore,
 }: {
   stats: ReturnType<typeof useCollectionStats>;
   onViewMore: () => void;
 }) {
+  const locale = useStickerStore((state) => state.settings.locale);
+
   return (
     <>
       <div className="w-full">
@@ -279,7 +356,7 @@ function CollectionHeader({
             </div>
             <div className="min-w-0 px-4 grid place-items-center p-4 md:p-6">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground text-center">
-                Collection Progress
+                {t(locale, "collection.progressLabel")}
               </p>
               <p className="mt-2 text-lg font-medium leading-none tracking-normal sm:text-3xl">
                 {stats.collected}/{stats.total}
@@ -292,7 +369,7 @@ function CollectionHeader({
                 onClick={onViewMore}
                 className="shrink-0 pt-1 text-sm font-medium text-primary inline-flex items-center gap-1 transition-opacity hover:opacity-80 px-4"
               >
-                View More
+                {t(locale, "collection.viewMore")}
                 <ChevronRight className="mt-0.5 size-5 " />
               </button>
             </div>
@@ -302,28 +379,28 @@ function CollectionHeader({
       <div className="w-ful grid grid-cols-4 divide-x text-center">
         <HeaderMetric
           icon={<CircleDot className="size-5 text-primary" />}
-          label="Collected"
+          label={t(locale, "collection.collected")}
           value={stats.collected}
         />
         <HeaderMetric
           icon={<CircleDot className="size-5 text-foreground" />}
-          label="Missing"
+          label={t(locale, "collection.missing")}
           value={stats.missing}
         />
         <HeaderMetric
           icon={<Trophy className="size-5 text-amber-500" />}
-          label="Duplicates"
+          label={t(locale, "collection.duplicates")}
           value={stats.duplicateCopies}
         />
         <HeaderMetric
           icon={<Sparkles className="size-5 text-yellow-400" />}
-          label="Special"
+          label={t(locale, "collection.special")}
           value={`${stats.specialCollected}/${stats.specialTotal}`}
         />
       </div>
     </>
   );
-}
+});
 
 function HeaderMetric({
   icon,
@@ -345,7 +422,7 @@ function HeaderMetric({
   );
 }
 
-function StickyControls({
+const StickyControls = React.memo(function StickyControls({
   activeTab,
   query,
   sortMode,
@@ -360,6 +437,8 @@ function StickyControls({
   onSortToggle: () => void;
   onTabChange: (tab: AlbumTab) => void;
 }) {
+  const locale = useStickerStore((state) => state.settings.locale);
+
   return (
     <section className="sticky top-14 z-30 -mx-4  bg-background px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="relative grid grid-cols-4">
@@ -373,7 +452,7 @@ function StickyControls({
               activeTab === tab.id && "text-primary",
             )}
           >
-            {tab.label}
+            {t(locale, tab.labelKey)}
           </button>
         ))}
 
@@ -394,7 +473,7 @@ function StickyControls({
           <Input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search ARG13, Mexico, shield..."
+            placeholder={t(locale, "common.searchPlaceholder")}
             className="h-12 pl-10 text-base shadow-none"
           />
         </div>
@@ -408,41 +487,309 @@ function StickyControls({
           onClick={onSortToggle}
           aria-label={
             sortMode === "grouped"
-              ? "Sort alphabetically"
-              : "Return to grouped order"
+              ? t(locale, "filters.sort.alphabetical")
+              : t(locale, "filters.sort.grouped")
           }
-          title={sortMode === "grouped" ? "Grouped order" : "A-Z order"}
+          title={
+            sortMode === "grouped"
+              ? t(locale, "filters.sort.alphabetical")
+              : t(locale, "filters.sort.grouped")
+          }
         >
           <SlidersHorizontal className="size-5" />
         </Button>
       </div>
     </section>
   );
-}
-const StickerSection = React.memo(function StickerSection({
-  group,
-  stickers: groupStickers,
-}: {
+});
+
+type StickerSectionViewModel = {
   group: StickerGroup;
   stickers: Sticker[];
-}) {
-  const collectionByStickerId = useStickerStore(
-    (state) => state.collectionByStickerId,
+  missing: number;
+  duplicates: number;
+};
+
+const AlbumTabPanel = React.memo(
+  function AlbumTabPanel({
+    tab,
+    active,
+    collectionByStickerId,
+    locale,
+    query,
+    sortMode,
+    onEditDuplicates,
+  }: {
+    tab: AlbumTab;
+    active: boolean;
+    collectionByStickerId: Record<string, number>;
+    locale: Locale;
+    query: string;
+    sortMode: SortMode;
+    onEditDuplicates: (sticker: Sticker) => void;
+  }) {
+    const sections = React.useMemo(
+      () =>
+        buildStickerSections({
+          activeTab: tab,
+          collectionByStickerId,
+          locale,
+          query,
+          sortMode,
+        }),
+      [collectionByStickerId, locale, query, sortMode, tab],
+    );
+
+    return (
+      <section
+        hidden={!active}
+        className="space-y-4"
+        style={active ? { viewTransitionName: "sticker-results" } : undefined}
+      >
+        {sections.map(
+          (
+            { group, stickers: groupStickers, missing, duplicates },
+            sectionIndex,
+          ) => (
+            <StickerSection
+              key={group.id}
+              active={active}
+              group={group}
+              stickers={groupStickers}
+              missing={missing}
+              duplicates={duplicates}
+              sectionIndex={sectionIndex}
+              onEditDuplicates={onEditDuplicates}
+            />
+          ),
+        )}
+
+        {sections.length === 0 && (
+          <Card className="shadow-none">
+            <CardContent className="flex min-h-32 flex-col items-center justify-center p-5 text-center">
+              <p className="text-sm font-medium">
+                {t(locale, "album.empty.title")}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t(locale, "album.empty.description")}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+    );
+  },
+  (prev, next) => {
+    if (!prev.active && !next.active) return true;
+
+    return (
+      prev.active === next.active &&
+      prev.tab === next.tab &&
+      prev.collectionByStickerId === next.collectionByStickerId &&
+      prev.locale === next.locale &&
+      prev.query === next.query &&
+      prev.sortMode === next.sortMode &&
+      prev.onEditDuplicates === next.onEditDuplicates
+    );
+  },
+);
+
+function buildStickerSections({
+  activeTab,
+  collectionByStickerId,
+  locale,
+  query,
+  sortMode,
+}: {
+  activeTab: AlbumTab;
+  collectionByStickerId: Record<string, number>;
+  locale: Locale;
+  query: string;
+  sortMode: SortMode;
+}): StickerSectionViewModel[] {
+  const normalizedQuery = normalizeStickerSearchText(query.trim());
+  const sectionsByGroupId = new Map<string, StickerSectionViewModel>();
+
+  for (const group of stickerGroups) {
+    sectionsByGroupId.set(group.id, {
+      group,
+      stickers: [],
+      missing: 0,
+      duplicates: 0,
+    });
+  }
+
+  for (const sticker of stickers) {
+    const copies = getStickerCopies(collectionByStickerId, sticker.id);
+    const matchesTab =
+      activeTab === "all" ||
+      (activeTab === "missing" && copies === 0) ||
+      (activeTab === "duplicates" && copies > 1) ||
+      (activeTab === "special" && sticker.special);
+
+    if (!matchesTab) continue;
+    if (
+      normalizedQuery &&
+      !matchesStickerQuery(sticker, normalizedQuery, locale)
+    ) {
+      continue;
+    }
+
+    const section = sectionsByGroupId.get(sticker.groupId);
+    if (!section) continue;
+
+    section.stickers.push(sticker);
+
+    if (copies === 0) section.missing += 1;
+    if (copies > 1) section.duplicates += copies - 1;
+  }
+
+  const sections = stickerGroups
+    .map((group) => sectionsByGroupId.get(group.id))
+    .filter((section): section is StickerSectionViewModel =>
+      Boolean(section && section.stickers.length > 0),
+    );
+
+  if (sortMode === "grouped") return sections;
+
+  return [...sections].sort((a, b) =>
+    getStickerGroupLabel(a.group, locale).localeCompare(
+      getStickerGroupLabel(b.group, locale),
+    ),
+  );
+}
+
+function matchesStickerQuery(
+  sticker: Sticker,
+  normalizedQuery: string,
+  locale: Locale,
+) {
+  return getStickerSearchValues(sticker, locale)
+    .some((value) =>
+      normalizeStickerSearchText(value).includes(normalizedQuery),
+    );
+}
+
+function useLazySection(enabled: boolean) {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const observerRef = React.useRef<IntersectionObserver | null>(null);
+  const rafRef = React.useRef<number | null>(null);
+  const revealedRef = React.useRef(false);
+
+  const [shouldRender, setShouldRender] = React.useState(false);
+  const [enter, setEnter] = React.useState(false);
+
+  const scheduleEnter = React.useCallback(() => {
+    if (enter || rafRef.current !== null) return;
+
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = null;
+      setEnter(true);
+    });
+  }, [enter]);
+
+  useIsomorphicLayoutEffect(() => {
+    if (!enabled || !shouldRender) return;
+
+    scheduleEnter();
+  }, [enabled, scheduleEnter, shouldRender]);
+
+  useIsomorphicLayoutEffect(() => {
+    const node = ref.current;
+
+    if (!enabled || shouldRender || !node) {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      return;
+    }
+
+    const reveal = () => {
+      if (revealedRef.current) return;
+
+      revealedRef.current = true;
+      setShouldRender(true);
+    };
+
+    if (typeof IntersectionObserver === "undefined") {
+      reveal();
+      return;
+    }
+
+    const rootMargin = 600;
+    const rect = node.getBoundingClientRect();
+    const withinMargin =
+      rect.bottom >= -rootMargin &&
+      rect.top <= window.innerHeight + rootMargin;
+
+    if (withinMargin) {
+      reveal();
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+
+        reveal();
+        observer.disconnect();
+
+        if (observerRef.current === observer) {
+          observerRef.current = null;
+        }
+      },
+      { rootMargin: `${rootMargin}px` },
+    );
+
+    observer.observe(node);
+    observerRef.current = observer;
+
+    return () => {
+      observer.disconnect();
+      if (observerRef.current === observer) {
+        observerRef.current = null;
+      }
+    };
+  }, [enabled, shouldRender]);
+
+  React.useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    },
+    [],
   );
 
+  return { ref, shouldRender, enter };
+}
+
+const StickerSection = React.memo(function StickerSection({
+  active,
+  group,
+  stickers: groupStickers,
+  missing,
+  duplicates,
+  sectionIndex,
+  onEditDuplicates,
+}: {
+  active: boolean;
+  group: StickerGroup;
+  stickers: Sticker[];
+  missing: number;
+  duplicates: number;
+  sectionIndex: number;
+  onEditDuplicates: (sticker: Sticker) => void;
+}) {
+  const locale = useStickerStore((state) => state.settings.locale);
+
   const [open, setOpen] = React.useState(true);
-
-  const missing = React.useMemo(() => {
-    return groupStickers.filter((s) => (collectionByStickerId[s.id] ?? 0) === 0)
-      .length;
-  }, [groupStickers, collectionByStickerId]);
-
-  const duplicates = React.useMemo(() => {
-    return groupStickers.reduce(
-      (sum, s) => sum + Math.max((collectionByStickerId[s.id] ?? 0) - 1, 0),
-      0,
-    );
-  }, [groupStickers, collectionByStickerId]);
+  const { ref, shouldRender, enter } = useLazySection(active && open);
+  const sectionAnimationDelay = Math.min(sectionIndex * 50, 200);
+  const gridClassName =
+    "grid grid-cols-4 gap-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 py-3";
 
   return (
     <section>
@@ -451,15 +798,19 @@ const StickerSection = React.memo(function StickerSection({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between gap-3 py-2 text-left"
       >
-        <div>
+        <header>
           <h2 className="text-lg font-semibold tracking-normal">
-            {group.label}
+            {getStickerGroupLabel(group, locale)}
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {missing} missing
-            {duplicates > 0 ? ` · ${duplicates} duplicates` : ""}
+            {duplicates > 0
+              ? t(locale, "album.group.summaryWithDuplicates", {
+                  missing,
+                  duplicates,
+                })
+              : t(locale, "album.group.summary", { missing })}
           </p>
-        </div>
+        </header>
         <ChevronDown
           className={cn(
             "size-5 text-muted-foreground transition-transform duration-200",
@@ -467,16 +818,6 @@ const StickerSection = React.memo(function StickerSection({
           )}
         />
       </button>
-
-      {/* {open && (
-        // <div className="min-h-0">
-        //           <div className="grid grid-cols-4 gap-3 py-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-        //             {groupStickers.map((sticker) => (
-        //               <StickerCard key={sticker.id} sticker={sticker} />
-        //             ))}
-        //           </div>
-        //         </div>
-        //       </div> */}
       <div
         className={cn(
           "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
@@ -484,234 +825,39 @@ const StickerSection = React.memo(function StickerSection({
         )}
       >
         <div className="min-h-0">
-          <div className="grid grid-cols-4 gap-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 py-3">
-            {groupStickers.map((sticker) => (
-              <StickerCard key={sticker.id} sticker={sticker} />
-            ))}
+          <div
+            ref={ref}
+            className={cn(
+              gridClassName,
+              "lazy-sticker-grid-ready",
+              enter && "lazy-sticker-grid-entered",
+            )}
+            style={
+              {
+                "--lazy-section-delay": `${sectionAnimationDelay}ms`,
+                ...(shouldRender && {
+                  contentVisibility: "auto",
+                  containIntrinsicSize: "auto 720px",
+                }),
+              } as React.CSSProperties
+            }
+          >
+            {shouldRender &&
+              groupStickers.map((sticker) => (
+                <StickerCard
+                  key={sticker.id}
+                  sticker={sticker}
+                  onEditDuplicates={onEditDuplicates}
+                />
+              ))}
           </div>
         </div>
       </div>
-      {/* )} */}
     </section>
   );
 });
-// function StickerSection({
-//   group,
-//   stickers: groupStickers,
-//   collectionByStickerId,
-// }: {
-//   group: StickerGroup;
-//   stickers: Sticker[];
-//   collectionByStickerId: Record<string, number>;
-// }) {
-//   const [open, setOpen] = React.useState(true);
-//   const missing = groupStickers.filter(
-//     (sticker) => getStickerCopies(collectionByStickerId, sticker.id) === 0,
-//   ).length;
-//   const duplicates = groupStickers.reduce(
-//     (sum, sticker) =>
-//       sum +
-//       Math.max(getStickerCopies(collectionByStickerId, sticker.id) - 1, 0),
-//     0,
-//   );
 
-//   return (
-//     <section>
-//       <button
-//         type="button"
-//         onClick={() => setOpen(!open)}
-//         className="flex w-full items-center justify-between gap-3 py-2 text-left"
-//       >
-//         <div>
-//           <h2 className="text-lg font-semibold tracking-normal">
-//             {group.label}
-//           </h2>
-//           <p className="mt-0.5 text-xs text-muted-foreground">
-//             {missing} missing
-//             {duplicates > 0 ? ` · ${duplicates} duplicates` : ""}
-//           </p>
-//         </div>
-//         <ChevronDown
-//           className={cn(
-//             "size-5 text-muted-foreground transition-transform duration-200",
-//             !open && "-rotate-90",
-//           )}
-//         />
-//       </button>
-//       <div
-//         className={cn(
-//           "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
-//           open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-//         )}
-//       >
-//         <div className="min-h-0">
-//           <div className="grid grid-cols-4 gap-3 py-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-//             {groupStickers.map((sticker) => (
-//               <StickerCard key={sticker.id} sticker={sticker} />
-//             ))}
-//           </div>
-//         </div>
-//       </div>
-//     </section>
-//   );
-// }
-
-// function StickerCard({ sticker }: { sticker: Sticker }) {
-//   const collectionByStickerId = useStickerStore(
-//     (state) => state.collectionByStickerId,
-//   );
-//   const tapSticker = useStickerStore((state) => state.tapSticker);
-//   const removeSticker = useStickerStore((state) => state.removeSticker);
-//   const animations = useStickerStore((state) => state.settings.animations);
-//   const [editorOpen, setEditorOpen] = React.useState(false);
-//   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
-//     null,
-//   );
-//   const longPressed = React.useRef(false);
-//   const copies = getStickerCopies(collectionByStickerId, sticker.id);
-//   const state = getVisualState(collectionByStickerId, sticker);
-
-//   const beginPress = () => {
-//     longPressed.current = false;
-//     longPressTimer.current = setTimeout(() => {
-//       longPressed.current = true;
-//       if (copies === 1) removeSticker(sticker.id);
-//       if (copies > 1) setEditorOpen(true);
-//     }, 450);
-//   };
-
-//   const endPress = () => {
-//     if (longPressTimer.current) clearTimeout(longPressTimer.current);
-//   };
-
-//   const handleClick = () => {
-//     if (longPressed.current) return;
-//     tapSticker(sticker.id);
-//   };
-
-//   return (
-//     <>
-//       <button
-//         type="button"
-//         onPointerDown={beginPress}
-//         onPointerUp={endPress}
-//         onPointerCancel={endPress}
-//         onPointerLeave={endPress}
-//         onClick={handleClick}
-//         className={cn(
-//           "relative flex aspect-[3/4.35] select-none items-center justify-center rounded-sm border text-2xl font-medium tracking-normal",
-//           "transition-[background-color,border-color,color,transform] duration-150 ease-out",
-//           animations && "active:scale-[0.97]",
-//           state === "missing" &&
-//             "border-dashed border-border/70 bg-background text-muted-foreground/70",
-//           state === "owned" &&
-//             "border-primary/25 bg-primary/[0.08] text-foreground",
-//           state === "duplicate" &&
-//             "border-primary/30 bg-primary/10 text-foreground",
-//           state === "special" &&
-//             "border-primary/25 bg-primary/[0.08] text-foreground",
-//         )}
-//         aria-label={`${sticker.code}, ${copies} copies`}
-//       >
-//         {sticker.special && (
-//           <span className="absolute right-3 top-3 text-sm leading-none text-yellow-400">
-//             ✨
-//           </span>
-//         )}
-//         <span>{sticker.number}</span>
-//         {state === "missing" && (
-//           <span className="absolute bottom-5 size-2 rounded-full border border-muted-foreground/60" />
-//         )}
-//         {copies > 1 && (
-//           <span className="absolute bottom-4 right-3 rounded-full border bg-background px-1.5 py-0.5 text-xs font-semibold leading-none text-foreground">
-//             x{copies - 1}
-//           </span>
-//         )}
-//       </button>
-//       <DuplicateEditor
-//         sticker={sticker}
-//         open={editorOpen}
-//         onOpenChange={setEditorOpen}
-//       />
-//     </>
-//   );
-// }
-
-// function DuplicateEditor({
-//   sticker,
-//   open,
-//   onOpenChange,
-// }: {
-//   sticker: Sticker;
-//   open: boolean;
-//   onOpenChange: (open: boolean) => void;
-// }) {
-//   const copies = useStickerStore(
-//     (state) => state.collectionByStickerId[sticker.id] ?? 0,
-//   );
-//   const setStickerCopies = useStickerStore((state) => state.setStickerCopies);
-//   const [draft, setDraft] = React.useState<number | null>(null);
-//   const duplicateDraft = draft ?? Math.max(copies - 1, 0);
-
-//   return (
-//     <Drawer
-//       open={open}
-//       onOpenChange={(nextOpen) => {
-//         if (!nextOpen) setDraft(null);
-//         onOpenChange(nextOpen);
-//       }}
-//     >
-//       <DrawerContent>
-//         <div className="px-5 pb-5 pt-4 text-center">
-//           <Badge variant="secondary" className="mb-3 rounded-sm">
-//             {sticker.code}
-//           </Badge>
-//           <DrawerTitle className="text-lg font-semibold">
-//             Edit duplicates
-//           </DrawerTitle>
-//           <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-//             Set extra copies for {sticker.groupLabel}.
-//           </DrawerDescription>
-//           <div className="mx-auto my-6 flex items-center justify-center gap-4">
-//             <Button
-//               size="icon"
-//               variant="secondary"
-//               className="rounded-full shadow-none"
-//               onClick={() =>
-//                 setDraft((value) => Math.max((value ?? duplicateDraft) - 1, 0))
-//               }
-//               aria-label="Decrease duplicates"
-//             >
-//               <Minus className="size-4" />
-//             </Button>
-//             <div className="min-w-14 text-3xl font-semibold">
-//               {duplicateDraft}
-//             </div>
-//             <Button
-//               size="icon"
-//               className="rounded-full shadow-none"
-//               onClick={() => setDraft((value) => (value ?? duplicateDraft) + 1)}
-//               aria-label="Increase duplicates"
-//             >
-//               <Plus className="size-4" />
-//             </Button>
-//           </div>
-//           <DrawerClose asChild>
-//             <Button
-//               size="pill"
-//               className="w-full"
-//               onClick={() => setStickerCopies(sticker.id, duplicateDraft + 1)}
-//             >
-//               Confirm
-//             </Button>
-//           </DrawerClose>
-//         </div>
-//       </DrawerContent>
-//     </Drawer>
-//   );
-// }
-
-function SettingsDrawer({
+const SettingsDrawer = React.memo(function SettingsDrawer({
   open,
   onOpenChange,
   collectionName,
@@ -727,12 +873,18 @@ function SettingsDrawer({
   const settings = useStickerStore((state) => state.settings);
   const updateSetting = useStickerStore((state) => state.updateSetting);
   const resetCollection = useStickerStore((state) => state.resetCollection);
-  const exportText = React.useMemo(
+  const locale = useStickerStore((state) => state.settings.locale);
+  const getExportText = React.useCallback(
     () =>
-      buildTxtExportByKind(exportKind, collectionName, collectionByStickerId),
-    [collectionByStickerId, collectionName, exportKind],
+      buildTxtExportByKind(
+        exportKind,
+        collectionName,
+        collectionByStickerId,
+        locale,
+      ),
+    [collectionByStickerId, collectionName, exportKind, locale],
   );
-  const exportMeta = getExportMeta(exportKind);
+  const exportMeta = getExportMeta(exportKind, locale);
 
   const updateTheme = (theme: ThemePreference) => {
     updateSetting("theme", theme);
@@ -745,45 +897,77 @@ function SettingsDrawer({
         <div className="space-y-5 px-5 pb-5 pt-4">
           <div>
             <DrawerTitle className="text-lg font-semibold">
-              Settings
+              {t(locale, "settings.title")}
             </DrawerTitle>
             <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-              Stored locally with automatic persistence.
+              {t(locale, "settings.description")}
             </DrawerDescription>
           </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">
+              {t(locale, "settings.language.title")}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {localeOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => updateSetting("locale", option.id)}
+                  className={cn(
+                    "h-10 rounded-sm border text-sm font-medium transition-colors",
+                    settings.locale === option.id &&
+                      "border-primary/40 bg-primary/10 text-primary",
+                  )}
+                >
+                  {t(locale, option.labelKey)}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-2">
-            {(["dark", "light", "system"] as const).map((theme) => (
-              <button
-                key={theme}
-                type="button"
-                onClick={() => updateTheme(theme)}
-                className={cn(
-                  "h-10 rounded-sm border text-sm font-medium capitalize transition-colors",
-                  settings.theme === theme &&
-                    "border-primary/40 bg-primary/10 text-primary",
-                )}
-              >
-                {theme}
-              </button>
-            ))}
+            {(["dark", "light", "system"] as const).map((theme) => {
+              const themeLabelKey =
+                theme === "dark"
+                  ? "settings.theme.dark"
+                  : theme === "light"
+                    ? "settings.theme.light"
+                    : "settings.theme.system";
+
+              return (
+                <button
+                  key={theme}
+                  type="button"
+                  onClick={() => updateTheme(theme)}
+                  className={cn(
+                    "h-10 rounded-sm border text-sm font-medium transition-colors",
+                    settings.theme === theme &&
+                      "border-primary/40 bg-primary/10 text-primary",
+                  )}
+                >
+                  {t(locale, themeLabelKey)}
+                </button>
+              );
+            })}
           </div>
           <div className="space-y-4">
             <SettingRow
-              title="Compact grid"
-              description="Tighter sticker spacing."
+              title={t(locale, "settings.compactGrid.title")}
+              description={t(locale, "settings.compactGrid.description")}
               checked={settings.compactMode}
               onChange={(checked) => updateSetting("compactMode", checked)}
             />
             <SettingRow
-              title="Animations"
-              description="Subtle press feedback."
+              title={t(locale, "settings.animations.title")}
+              description={t(locale, "settings.animations.description")}
               checked={settings.animations}
               onChange={(checked) => updateSetting("animations", checked)}
             />
           </div>
           <div className="space-y-3 border-t pt-4">
             <div>
-              <p className="mb-2 text-sm font-medium">Export</p>
+              <p className="mb-2 text-sm font-medium">
+                {t(locale, "settings.export.title")}
+              </p>
               <ExportTypeSelector value={exportKind} onChange={setExportKind} />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -792,28 +976,31 @@ function SettingsDrawer({
                 size="pill"
                 className="shadow-none"
                 onClick={async () => {
+                  const exportText = getExportText();
                   const copied = await copyText(exportText);
                   if (!copied) downloadText(exportMeta.fileName, exportText);
                 }}
               >
                 <Copy className="size-4" />
-                Copy TXT
+                {t(locale, "settings.export.copyTxt")}
               </Button>
               <Button
                 size="pill"
                 className="shadow-none"
-                onClick={() => downloadText(exportMeta.fileName, exportText)}
+                onClick={() =>
+                  downloadText(exportMeta.fileName, getExportText())
+                }
               >
                 <Download className="size-4" />
-                Download
+                {t(locale, "settings.export.download")}
               </Button>
             </div>
           </div>
           <div className="space-y-3 border-t pt-4">
             <div>
-              <p className="text-sm font-medium">Collection Reset</p>
+              <p className="text-sm font-medium">{t(locale, "settings.reset.title")}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Clear all local sticker progress and duplicate counts.
+                {t(locale, "settings.reset.description")}
               </p>
             </div>
             <AlertDialog>
@@ -824,21 +1011,22 @@ function SettingsDrawer({
                   className="w-full border-destructive/40 text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
                 >
                   <RotateCcw className="size-4" />
-                  Reset Album
+                  {t(locale, "settings.reset.button")}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Reset Album?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {t(locale, "settings.reset.dialogTitle")}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently remove all your collection progress
-                    and duplicate counts from this device.
+                    {t(locale, "settings.reset.dialogDescription")}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel asChild>
                     <Button variant="secondary" className="shadow-none">
-                      Cancel
+                      {t(locale, "settings.reset.dialogCancel")}
                     </Button>
                   </AlertDialogCancel>
                   <AlertDialogAction asChild>
@@ -847,7 +1035,7 @@ function SettingsDrawer({
                       className="shadow-none"
                       onClick={resetCollection}
                     >
-                      Reset Album
+                      {t(locale, "settings.reset.dialogConfirm")}
                     </Button>
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -858,9 +1046,9 @@ function SettingsDrawer({
       </DrawerContent>
     </Drawer>
   );
-}
+});
 
-function ShareDrawer({
+const ShareDrawer = React.memo(function ShareDrawer({
   open,
   onOpenChange,
   collectionName,
@@ -874,12 +1062,18 @@ function ShareDrawer({
   onShareStateChange: (state: "idle" | "copied" | "downloaded") => void;
 }) {
   const [exportKind, setExportKind] = React.useState<ExportKind>("missing");
-  const exportText = React.useMemo(
+  const locale = useStickerStore((state) => state.settings.locale);
+  const getExportText = React.useCallback(
     () =>
-      buildTxtExportByKind(exportKind, collectionName, collectionByStickerId),
-    [collectionByStickerId, collectionName, exportKind],
+      buildTxtExportByKind(
+        exportKind,
+        collectionName,
+        collectionByStickerId,
+        locale,
+      ),
+    [collectionByStickerId, collectionName, exportKind, locale],
   );
-  const exportMeta = getExportMeta(exportKind);
+  const exportMeta = getExportMeta(exportKind, locale);
 
   const announceShareState = React.useCallback(
     (state: "copied" | "downloaded") => {
@@ -890,6 +1084,8 @@ function ShareDrawer({
   );
 
   const shareExport = async () => {
+    const exportText = getExportText();
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -919,10 +1115,10 @@ function ShareDrawer({
         <div className="space-y-5 px-5 pb-5 pt-4">
           <div>
             <DrawerTitle className="text-lg font-semibold">
-              What do you want to share?
+              {t(locale, "share.title")}
             </DrawerTitle>
             <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-              Choose a list of stickers, then share or save it as TXT.
+              {t(locale, "share.description")}
             </DrawerDescription>
           </div>
 
@@ -935,13 +1131,14 @@ function ShareDrawer({
               onClick={shareExport}
             >
               <Share2 className="size-4" />
-              Share
+              {t(locale, "share.action.share")}
             </Button>
             <Button
               variant="secondary"
               size="pill"
               className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-sm px-2 py-2 text-xs shadow-none"
               onClick={async () => {
+                const exportText = getExportText();
                 const copied = await copyText(exportText);
                 if (copied) {
                   announceShareState("copied");
@@ -952,26 +1149,26 @@ function ShareDrawer({
               }}
             >
               <Copy className="size-4" />
-              Copy TXT
+              {t(locale, "share.action.copyTxt")}
             </Button>
             <Button
               variant="secondary"
               size="pill"
               className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-sm px-2 py-2 text-xs shadow-none"
               onClick={() => {
-                downloadText(exportMeta.fileName, exportText);
+                downloadText(exportMeta.fileName, getExportText());
                 announceShareState("downloaded");
               }}
             >
               <Download className="size-4" />
-              Download TXT
+              {t(locale, "share.action.downloadTxt")}
             </Button>
           </div>
         </div>
       </DrawerContent>
     </Drawer>
   );
-}
+});
 
 function ExportTypeSelector({
   value,
@@ -980,6 +1177,8 @@ function ExportTypeSelector({
   value: ExportKind;
   onChange: (value: ExportKind) => void;
 }) {
+  const locale = useStickerStore((state) => state.settings.locale);
+
   return (
     <div className="grid grid-cols-3 gap-2">
       {stickerExportOptions.map((option) => (
@@ -994,59 +1193,68 @@ function ExportTypeSelector({
               : "bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground",
           )}
         >
-          {option.label}
+          {t(locale, option.labelKey)}
         </button>
       ))}
     </div>
   );
 }
 
-function mapStatsToItems(stats: ReturnType<typeof useCollectionStats>) {
+function mapStatsToItems(
+  locale: Locale,
+  stats: ReturnType<typeof useCollectionStats>,
+) {
   return [
-    { label: "Ratio", value: `${stats.collected}/${stats.total}` },
-    { label: "Percent", value: `${stats.completion}%` },
-    { label: "Total", value: stats.total },
+    { label: t(locale, "collection.ratio"), value: `${stats.collected}/${stats.total}` },
+    { label: t(locale, "collection.percent"), value: `${stats.completion}%` },
+    { label: t(locale, "collection.total"), value: stats.total },
 
-    { label: "Collected", value: stats.collected },
-    { label: "Missing", value: stats.missing },
-    { label: "Duplicates", value: stats.duplicateCopies },
+    { label: t(locale, "collection.collected"), value: stats.collected },
+    { label: t(locale, "collection.missing"), value: stats.missing },
+    { label: t(locale, "collection.duplicates"), value: stats.duplicateCopies },
 
     {
-      label: "Special",
+      label: t(locale, "collection.special"),
       value: `${stats.specialCollected}/${stats.specialTotal}`,
     },
     {
-      label: "Teams",
+      label: t(locale, "stats.summary.teams"),
       value: `${stats.teamCollected}/${stats.teamTotal}`,
     },
     {
-      label: "Shields",
+      label: t(locale, "stats.summary.shields"),
       value: `${stats.shieldCollected}/${stats.shieldTotal}`,
     },
   ];
 }
 
-function StatsDrawer({
+const StatsDrawer = React.memo(function StatsDrawer({
   open,
   onOpenChange,
+  collectionByStickerId,
+  stats,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  collectionByStickerId: Record<string, number>;
+  stats: ReturnType<typeof useCollectionStats>;
 }) {
   const [activeTab, setActiveTab] = React.useState<StatsTab>("summary");
   const [teamSort, setTeamSort] = React.useState<TeamSortMode>("most");
-  const collectionByStickerId = useStickerStore(
-    (state) => state.collectionByStickerId,
+  const locale = useStickerStore((state) => state.settings.locale);
+  const items = React.useMemo(
+    () => (open ? mapStatsToItems(locale, stats) : []),
+    [locale, open, stats],
   );
-  const stats = useCollectionStats();
-  const items = mapStatsToItems(stats);
 
   const teamProgress = React.useMemo(
     () =>
-      buildTeamProgress(collectionByStickerId).sort((a, b) =>
-        teamSort === "most" ? b.percent - a.percent : a.percent - b.percent,
-      ),
-    [collectionByStickerId, teamSort],
+      !open || activeTab !== "teams"
+        ? []
+        : buildTeamProgress(collectionByStickerId).sort((a, b) =>
+            teamSort === "most" ? b.percent - a.percent : a.percent - b.percent,
+          ),
+    [activeTab, collectionByStickerId, open, teamSort],
   );
 
   return (
@@ -1055,10 +1263,10 @@ function StatsDrawer({
         <div className="space-y-5 overflow-y-auto px-5 pb-5 pt-4">
           <div>
             <DrawerTitle className="text-lg font-semibold">
-              Collection Summary
+              {t(locale, "stats.title")}
             </DrawerTitle>
             <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-              Progress is calculated from the current album data.
+              {t(locale, "stats.description")}
             </DrawerDescription>
           </div>
 
@@ -1103,7 +1311,7 @@ function StatsDrawer({
                   activeTab === tab && "text-primary",
                 )}
               >
-                {tab}
+                {t(locale, `stats.tabs.${tab}` as const)}
                 <span
                   className={cn(
                     "absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary opacity-0",
@@ -1117,22 +1325,22 @@ function StatsDrawer({
           {activeTab === "summary" ? (
             <div className="space-y-3">
               <ProgressRow
-                label="Album completion"
+                label={t(locale, "stats.summary.albumCompletion")}
                 value={stats.completion}
                 detail={`${stats.collected}/${stats.total}`}
               />
               <ProgressRow
-                label="Special completion"
+                label={t(locale, "stats.summary.specialCompletion")}
                 value={percentage(stats.specialCollected, stats.specialTotal)}
                 detail={`${stats.specialCollected}/${stats.specialTotal}`}
               />
               <ProgressRow
-                label="Teams"
+                label={t(locale, "stats.summary.teams")}
                 value={percentage(stats.teamCollected, stats.teamTotal)}
                 detail={`${stats.teamCollected}/${stats.teamTotal}`}
               />
               <ProgressRow
-                label="Shields"
+                label={t(locale, "stats.summary.shields")}
                 value={percentage(stats.shieldCollected, stats.shieldTotal)}
                 detail={`${stats.shieldCollected}/${stats.shieldTotal}`}
               />
@@ -1148,8 +1356,8 @@ function StatsDrawer({
                 }
               >
                 {teamSort === "most"
-                  ? "Most complete first"
-                  : "Least complete first"}
+                  ? t(locale, "stats.sort.most")
+                  : t(locale, "stats.sort.least")}
               </Button>
               {teamProgress.map((item) => (
                 <TeamProgressRow key={item.code} item={item} />
@@ -1160,7 +1368,7 @@ function StatsDrawer({
       </DrawerContent>
     </Drawer>
   );
-}
+});
 
 function ProgressRing({
   value,
@@ -1169,6 +1377,7 @@ function ProgressRing({
   value: number;
   size?: "default" | "large";
 }) {
+  const locale = useStickerStore((state) => state.settings.locale);
   const dimensions = size === "large" ? 112 : 72;
   const stroke = size === "large" ? 5 : 4;
   const radius = (dimensions - stroke) / 2;
@@ -1214,26 +1423,11 @@ function ProgressRing({
           {value}%
         </p>
         {size === "large" && (
-          <p className="mt-2 text-sm text-muted-foreground">Complete</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t(locale, "collection.complete")}
+          </p>
         )}
       </div>
-    </div>
-  );
-}
-
-function StatCell({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("p-2 ", className)}>
-      <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold">{value}</p>
     </div>
   );
 }

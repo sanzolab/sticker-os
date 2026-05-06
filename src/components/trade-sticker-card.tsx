@@ -1,4 +1,5 @@
 import { stickersById } from "@/lib/sticker-data";
+import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ export function TradeStickerCard({
 }) {
   const sticker = stickersById[stickerId];
   const animations = useStickerStore((state) => state.settings.animations);
+  const locale = useStickerStore((state) => state.settings.locale);
 
   if (!sticker) return null;
 
@@ -22,7 +24,11 @@ export function TradeStickerCard({
       onClick={onToggle}
       className="group text-left"
       aria-pressed={selected}
-      aria-label={`${selected ? "Remove" : "Select"} ${sticker.code}`}
+      aria-label={
+        selected
+          ? t(locale, "sticker.aria.remove", { code: sticker.code })
+          : t(locale, "sticker.aria.select", { code: sticker.code })
+      }
     >
       <span
         className={cn(

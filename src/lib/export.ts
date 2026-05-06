@@ -1,6 +1,12 @@
 "use client";
 
-import { getStickerCopies, stickerGroups, stickers } from "@/lib/sticker-data";
+import {
+  getStickerCopies,
+  getStickerExportLabel,
+  stickerGroups,
+  stickers,
+} from "@/lib/sticker-data";
+import { t, type Locale } from "@/lib/i18n";
 
 type CollectionByStickerId = Record<string, number>;
 
@@ -8,22 +14,29 @@ export type ExportKind = "missing" | "duplicates" | "both";
 
 const exportOptions: Record<
   ExportKind,
-  { label: string; fileName: string; shareTitle: string }
+  {
+    labelKey: "export.kind.missing" | "export.kind.duplicates" | "export.kind.both";
+    fileName: string;
+    shareTitleKey:
+      | "export.shareTitle.missing"
+      | "export.shareTitle.duplicates"
+      | "export.shareTitle.both";
+  }
 > = {
   missing: {
-    label: "Missing",
+    labelKey: "export.kind.missing",
     fileName: "stickeros-missing-list.txt",
-    shareTitle: "StickerOS missing list",
+    shareTitleKey: "export.shareTitle.missing",
   },
   duplicates: {
-    label: "Duplicate",
+    labelKey: "export.kind.duplicates",
     fileName: "stickeros-duplicate-list.txt",
-    shareTitle: "StickerOS duplicate list",
+    shareTitleKey: "export.shareTitle.duplicates",
   },
   both: {
-    label: "Both",
+    labelKey: "export.kind.both",
     fileName: "stickeros-collection-list.txt",
-    shareTitle: "StickerOS collection list",
+    shareTitleKey: "export.shareTitle.both",
   },
 };
 
@@ -34,18 +47,25 @@ export const stickerExportOptions = (
   ][]
 ).map(([id, option]) => ({ id, ...option }));
 
-export function getExportMeta(kind: ExportKind) {
-  return exportOptions[kind];
+export function getExportMeta(kind: ExportKind, locale: Locale) {
+  const option = exportOptions[kind];
+
+  return {
+    fileName: option.fileName,
+    label: t(locale, option.labelKey),
+    shareTitle: t(locale, option.shareTitleKey),
+  };
 }
 
 export function buildMissingTxtExport(
   collectionName: string,
   collectionByStickerId: CollectionByStickerId,
+  locale: Locale,
 ) {
-  return buildTxtExport(collectionName, [
+  return buildTxtExport(locale, collectionName, [
     {
-      title: "Me faltan:",
-      rows: buildMissingRows(collectionByStickerId),
+      title: t(locale, "export.txt.missingSection"),
+      rows: buildMissingRows(collectionByStickerId, locale),
     },
   ]);
 }
@@ -53,11 +73,12 @@ export function buildMissingTxtExport(
 export function buildDuplicatesTxtExport(
   collectionName: string,
   collectionByStickerId: CollectionByStickerId,
+  locale: Locale,
 ) {
-  return buildTxtExport(collectionName, [
+  return buildTxtExport(locale, collectionName, [
     {
-      title: "Tengo repetidas:",
-      rows: buildDuplicateRows(collectionByStickerId),
+      title: t(locale, "export.txt.duplicatesSection"),
+      rows: buildDuplicateRows(collectionByStickerId, locale),
     },
   ]);
 }
@@ -65,15 +86,16 @@ export function buildDuplicatesTxtExport(
 export function buildCombinedTxtExport(
   collectionName: string,
   collectionByStickerId: CollectionByStickerId,
+  locale: Locale,
 ) {
-  return buildTxtExport(collectionName, [
+  return buildTxtExport(locale, collectionName, [
     {
-      title: "Me faltan:",
-      rows: buildMissingRows(collectionByStickerId),
+      title: t(locale, "export.txt.missingSection"),
+      rows: buildMissingRows(collectionByStickerId, locale),
     },
     {
-      title: "Tengo repetidas:",
-      rows: buildDuplicateRows(collectionByStickerId),
+      title: t(locale, "export.txt.duplicatesSection"),
+      rows: buildDuplicateRows(collectionByStickerId, locale),
     },
   ]);
 }
@@ -82,23 +104,25 @@ export function buildTxtExportByKind(
   kind: ExportKind,
   collectionName: string,
   collectionByStickerId: CollectionByStickerId,
+  locale: Locale,
 ) {
   if (kind === "duplicates") {
-    return buildDuplicatesTxtExport(collectionName, collectionByStickerId);
+    return buildDuplicatesTxtExport(collectionName, collectionByStickerId, locale);
   }
 
   if (kind === "both") {
-    return buildCombinedTxtExport(collectionName, collectionByStickerId);
+    return buildCombinedTxtExport(collectionName, collectionByStickerId, locale);
   }
 
-  return buildMissingTxtExport(collectionName, collectionByStickerId);
+  return buildMissingTxtExport(collectionName, collectionByStickerId, locale);
 }
 
 function buildTxtExport(
+  locale: Locale,
   collectionName: string,
   sections: { title: string; rows: string[] }[],
 ) {
-  const lines = ["Figuritas App - Lista", collectionName, ""];
+  const lines = [t(locale, "export.txt.documentTitle"), collectionName, ""];
 
   sections.forEach((section, index) => {
     if (index > 0) lines.push("");
@@ -108,7 +132,10 @@ function buildTxtExport(
   return lines.join("\n");
 }
 
-function buildMissingRows(collectionByStickerId: CollectionByStickerId) {
+function buildMissingRows(
+  collectionByStickerId: CollectionByStickerId,
+  locale: Locale,
+) {
   return stickerGroups
     .map((group) => {
       const missing = stickers
@@ -120,12 +147,15 @@ function buildMissingRows(collectionByStickerId: CollectionByStickerId) {
         .map((sticker) => sticker.number);
 
       if (missing.length === 0) return null;
-      return `${group.exportLabel}: ${missing.join(", ")}`;
+      return `${getStickerExportLabel(group, locale)}: ${missing.join(", ")}`;
     })
     .filter((row): row is string => Boolean(row));
 }
 
-function buildDuplicateRows(collectionByStickerId: CollectionByStickerId) {
+function buildDuplicateRows(
+  collectionByStickerId: CollectionByStickerId,
+  locale: Locale,
+) {
   return stickerGroups
     .map((group) => {
       const duplicates = stickers
@@ -140,7 +170,7 @@ function buildDuplicateRows(collectionByStickerId: CollectionByStickerId) {
         .filter((item): item is string => Boolean(item));
 
       if (duplicates.length === 0) return null;
-      return `${group.exportLabel}: ${duplicates.join(", ")}`;
+      return `${getStickerExportLabel(group, locale)}: ${duplicates.join(", ")}`;
     })
     .filter((row): row is string => Boolean(row));
 }

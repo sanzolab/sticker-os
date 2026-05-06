@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n";
+
 export type StickerCategory = "fwc" | "cc" | "country";
 export type StickerKind =
   | "trophy"
@@ -13,6 +15,8 @@ export type StickerGroup = {
   id: string;
   label: string;
   exportLabel: string;
+  labels?: Partial<Record<Locale, string>>;
+  exportLabels?: Partial<Record<Locale, string>>;
   category: StickerCategory;
   countryCode?: string;
   flag?: string;
@@ -36,20 +40,44 @@ export type Sticker = {
 const fwcGroups: StickerGroup[] = [
   {
     id: "fwc-trophy",
-    label: "FWC - Especiales 🏆",
-    exportLabel: "FWC - Especiales 🏆",
+    label: "FWC - Specials 🏆",
+    exportLabel: "FWC - Specials 🏆",
+    labels: {
+      en: "FWC - Specials 🏆",
+      es: "FWC - Especiales 🏆",
+    },
+    exportLabels: {
+      en: "FWC - Specials 🏆",
+      es: "FWC - Especiales 🏆",
+    },
     category: "fwc",
   },
   {
     id: "fwc-world",
-    label: "FWC - Balon y Países 🌎",
-    exportLabel: "FWC - Balon y Países 🌎",
+    label: "FWC - Ball and Countries 🌎",
+    exportLabel: "FWC - Ball and Countries 🌎",
+    labels: {
+      en: "FWC - Ball and Countries 🌎",
+      es: "FWC - Balón y Países 🌎",
+    },
+    exportLabels: {
+      en: "FWC - Ball and Countries 🌎",
+      es: "FWC - Balón y Países 🌎",
+    },
     category: "fwc",
   },
   {
     id: "fwc-history",
-    label: "FWC - Historia 📜",
-    exportLabel: "FWC - Historia 📜",
+    label: "FWC - History 📜",
+    exportLabel: "FWC - History 📜",
+    labels: {
+      en: "FWC - History 📜",
+      es: "FWC - Historia 📜",
+    },
+    exportLabels: {
+      en: "FWC - History 📜",
+      es: "FWC - Historia 📜",
+    },
     category: "fwc",
   },
 ];
@@ -452,6 +480,77 @@ const countryGroups: StickerGroup[] = [
 
 export const stickerGroups = [...fwcGroups, ...ccGroups, ...countryGroups];
 export const sectionOrder = stickerGroups.map((group) => group.id);
+export const stickerGroupsById = Object.fromEntries(
+  stickerGroups.map((group) => [group.id, group]),
+);
+
+const stickerKindSearchLabels: Record<Locale, Record<StickerKind, string[]>> = {
+  en: {
+    trophy: ["trophy"],
+    world: ["world", "ball", "countries"],
+    history: ["history"],
+    sponsor: ["sponsor"],
+    shield: ["shield"],
+    team: ["team", "team photo"],
+    player: ["player"],
+  },
+  es: {
+    trophy: ["trofeo", "copa"],
+    world: ["mundo", "balon", "balón", "paises", "países"],
+    history: ["historia"],
+    sponsor: ["patrocinador"],
+    shield: ["escudo"],
+    team: ["equipo", "foto de equipo"],
+    player: ["jugador"],
+  },
+};
+
+export function normalizeStickerSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function getStickerGroupLabel(group: StickerGroup, locale: Locale) {
+  return group.labels?.[locale] ?? group.label;
+}
+
+export function getStickerExportLabel(group: StickerGroup, locale: Locale) {
+  return group.exportLabels?.[locale] ?? group.exportLabel;
+}
+
+export function getStickerGroupLabelById(groupId: string, locale: Locale) {
+  const group = stickerGroupsById[groupId];
+
+  return group ? getStickerGroupLabel(group, locale) : groupId;
+}
+
+export function getStickerSearchValues(sticker: Sticker, locale: Locale) {
+  const group = stickerGroupsById[sticker.groupId];
+  const values = [
+    sticker.number,
+    sticker.code,
+    sticker.title,
+    sticker.groupLabel,
+    sticker.countryCode,
+    sticker.exportLabel,
+    sticker.kind,
+    ...stickerKindSearchLabels.en[sticker.kind],
+    ...stickerKindSearchLabels[locale][sticker.kind],
+  ];
+
+  if (group) {
+    values.push(
+      getStickerGroupLabel(group, locale),
+      getStickerExportLabel(group, locale),
+      getStickerGroupLabel(group, "en"),
+      getStickerExportLabel(group, "en"),
+    );
+  }
+
+  return values.filter((value): value is string => Boolean(value));
+}
 
 function makeFwcSticker(
   group: StickerGroup,

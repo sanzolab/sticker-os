@@ -3,8 +3,15 @@
 import * as React from "react";
 import { ImageUp, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { t } from "@/lib/i18n";
+import { useStickerStore } from "@/lib/store";
 
 type ScannerStatus = "loading" | "ready" | "error";
+type ScannerMessageKey =
+  | "scanner.message.preparing"
+  | "scanner.message.ready"
+  | "scanner.message.cameraUnavailable"
+  | "scanner.message.noQrFound";
 
 export function TradeScanner({
   onScan,
@@ -16,7 +23,9 @@ export function TradeScanner({
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const scannedRef = React.useRef(false);
   const [status, setStatus] = React.useState<ScannerStatus>("loading");
-  const [message, setMessage] = React.useState("Preparing camera...");
+  const [messageKey, setMessageKey] =
+    React.useState<ScannerMessageKey>("scanner.message.preparing");
+  const locale = useStickerStore((state) => state.settings.locale);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -45,12 +54,12 @@ export function TradeScanner({
 
         if (!cancelled) {
           setStatus("ready");
-          setMessage("Point the camera at a StickerOS trade QR.");
+          setMessageKey("scanner.message.ready");
         }
       } catch {
         if (!cancelled) {
           setStatus("error");
-          setMessage("Camera access is unavailable. Upload a QR image instead.");
+          setMessageKey("scanner.message.cameraUnavailable");
         }
       }
     }
@@ -73,7 +82,7 @@ export function TradeScanner({
       onScan(result.data);
     } catch {
       setStatus("error");
-      setMessage("No readable StickerOS QR was found in that image.");
+      setMessageKey("scanner.message.noQrFound");
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -92,13 +101,15 @@ export function TradeScanner({
           <div className="absolute inset-0 grid place-items-center bg-background/80 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-2">
               <ScanLine className="size-4" />
-              Preparing camera
+              {t(locale, "scanner.overlay.preparing")}
             </span>
           </div>
         )}
       </div>
 
-      <p className="text-sm text-muted-foreground">{message}</p>
+      <p className="text-sm text-muted-foreground">
+        {t(locale, messageKey)}
+      </p>
 
       <input
         ref={fileInputRef}
@@ -119,7 +130,7 @@ export function TradeScanner({
         onClick={() => fileInputRef.current?.click()}
       >
         <ImageUp className="size-4" />
-        Upload QR Image
+        {t(locale, "scanner.upload")}
       </Button>
     </div>
   );

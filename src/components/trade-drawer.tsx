@@ -37,6 +37,7 @@ import {
   serializeTradeQrPayload,
   type TradeQrParseError,
 } from "@/lib/trade-qr";
+import { t } from "@/lib/i18n";
 import { TradeScanner } from "./trade-scanner";
 import { TradeStickerCard } from "./trade-sticker-card";
 
@@ -48,6 +49,16 @@ type TradeResult = {
   giveIds: string[];
 };
 
+type TradeMessageKey =
+  | "trade.error.invalidCollection"
+  | "trade.error.invalidLength"
+  | "trade.error.invalidHash"
+  | "trade.error.invalidVersion"
+  | "trade.error.invalidBitset"
+  | "trade.error.invalidQr"
+  | "trade.error.staleDuplicates"
+  | "trade.error.invalidSelection";
+
 export function TradeDrawer({
   open,
   onOpenChange,
@@ -56,12 +67,15 @@ export function TradeDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const [step, setStep] = React.useState<TradeStep>("entry");
-  const [scanError, setScanError] = React.useState<string | null>(null);
-  const [applyError, setApplyError] = React.useState<string | null>(null);
+  const [scanErrorKey, setScanErrorKey] =
+    React.useState<TradeMessageKey | null>(null);
+  const [applyErrorKey, setApplyErrorKey] =
+    React.useState<TradeMessageKey | null>(null);
   const [result, setResult] = React.useState<TradeResult | null>(null);
   const [selectedReceiveIds, setSelectedReceiveIds] = React.useState<string[]>([]);
   const [selectedGiveIds, setSelectedGiveIds] = React.useState<string[]>([]);
 
+  const locale = useStickerStore((state) => state.settings.locale);
   const collectionName = useStickerStore((state) => state.selectedCollection);
   const collectionByStickerId = useStickerStore(
     (state) => state.collectionByStickerId,
@@ -79,8 +93,8 @@ export function TradeDrawer({
 
   const resetFlow = React.useCallback(() => {
     setStep("entry");
-    setScanError(null);
-    setApplyError(null);
+    setScanErrorKey(null);
+    setApplyErrorKey(null);
     setResult(null);
     setSelectedReceiveIds([]);
     setSelectedGiveIds([]);
@@ -96,7 +110,7 @@ export function TradeDrawer({
       const parsed = parseTradeQrPayload(value);
 
       if (!parsed.ok) {
-        setScanError(getTradeParseMessage(parsed.reason));
+        setScanErrorKey(getTradeParseMessageKey(parsed.reason));
         return;
       }
 
@@ -108,26 +122,26 @@ export function TradeDrawer({
       });
 
       setResult({
-        remoteName: parsed.payload.name || "Collector",
+        remoteName: parsed.payload.name || "",
         receiveIds: matches.receiveIds,
         giveIds: matches.giveIds,
       });
       setSelectedReceiveIds(matches.receiveIds);
       setSelectedGiveIds(matches.giveIds);
-      setScanError(null);
-      setApplyError(null);
+      setScanErrorKey(null);
+      setApplyErrorKey(null);
       setStep("result");
     },
     [collectionByStickerId],
   );
 
   const toggleReceive = (id: string) => {
-    setApplyError(null);
+    setApplyErrorKey(null);
     setSelectedReceiveIds((ids) => toggleId(ids, id));
   };
 
   const toggleGive = (id: string) => {
-    setApplyError(null);
+    setApplyErrorKey(null);
     setSelectedGiveIds((ids) => toggleId(ids, id));
   };
 
@@ -144,16 +158,20 @@ export function TradeDrawer({
   const canConfirm =
     selectedReceiveIds.length > 0 && selectedGiveIds.length > 0 && Boolean(result);
 
-  const confirmLabel = `Confirm Trade (${selectedReceiveIds.length} for ${selectedGiveIds.length})`;
+  const confirmLabel = t(locale, "trade.confirm.label", {
+    receive: selectedReceiveIds.length,
+    give: selectedGiveIds.length,
+  });
+  const remoteName = result?.remoteName || t(locale, "trade.collectorFallback");
 
   const confirmTrade = () => {
     const tradeResult = applyTrade(selectedReceiveIds, selectedGiveIds);
 
     if (!tradeResult.ok) {
-      setApplyError(
+      setApplyErrorKey(
         tradeResult.reason === "stale-duplicates"
-          ? "Your duplicates changed. Review this trade before trying again."
-          : "Select at least one sticker to receive and one to give.",
+          ? "trade.error.staleDuplicates"
+          : "trade.error.invalidSelection",
       );
       return;
     }
@@ -171,10 +189,10 @@ export function TradeDrawer({
                 {displayName || "StickerOS"}
               </Badge>
               <DrawerTitle className="text-lg font-semibold">
-                Trade stickers
+                {t(locale, "trade.title")}
               </DrawerTitle>
               <DrawerDescription className="mt-1 text-sm text-muted-foreground">
-                Share your missing and duplicate stickers with another collector.
+                {t(locale, "trade.description")}
               </DrawerDescription>
             </div>
 
@@ -195,7 +213,7 @@ export function TradeDrawer({
               onClick={() => setStep("scan")}
             >
               <ScanLine className="size-4" />
-              Scan QR
+              {t(locale, "trade.scan.button")}
             </Button>
           </div>
         )}
@@ -203,13 +221,13 @@ export function TradeDrawer({
         {step === "scan" && (
           <div className="space-y-5 px-5 pb-5 pt-4">
             <DrawerHeader
-              title="Scan trade QR"
-              description="Compare collections locally from another StickerOS QR."
+              title={t(locale, "trade.scan.title")}
+              description={t(locale, "trade.scan.description")}
             />
             <TradeScanner onScan={handleScan} />
-            {scanError && (
+            {scanErrorKey && (
               <p className="rounded-sm border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                {scanError}
+                {t(locale, scanErrorKey)}
               </p>
             )}
             <Button
@@ -218,12 +236,12 @@ export function TradeDrawer({
               size="pill"
               className="w-full shadow-none"
               onClick={() => {
-                setScanError(null);
+                setScanErrorKey(null);
                 setStep("entry");
               }}
             >
               <ArrowLeft className="size-4" />
-              Back to my QR
+              {t(locale, "trade.scan.back")}
             </Button>
           </div>
         )}
@@ -232,29 +250,43 @@ export function TradeDrawer({
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5 pt-4">
               <DrawerHeader
-                title="Trade comparison"
-                description={`Matched with ${result.remoteName}. Choose what to exchange.`}
+                title={t(locale, "trade.comparison.title")}
+                description={t(locale, "trade.comparison.description", {
+                  name: remoteName,
+                })}
               />
 
               {result.receiveIds.length === 0 && result.giveIds.length === 0 ? (
                 <div className="rounded-sm border bg-card p-5 text-center">
-                  <p className="text-sm font-medium">No trade matches found</p>
+                  <p className="text-sm font-medium">
+                    {t(locale, "trade.comparison.noMatchesTitle")}
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Your duplicate and missing lists do not overlap yet.
+                    {t(locale, "trade.comparison.noMatchesDescription")}
                   </p>
                 </div>
               ) : (
                 <>
                   <TradeSection
-                    title="What you can receive"
-                    detail={`${result.remoteName} has ${result.receiveIds.length} stickers you need.`}
+                    title={t(locale, "trade.section.receive.title", {
+                      count: result.receiveIds.length,
+                    })}
+                    detail={t(locale, "trade.section.receive.detail", {
+                      name: remoteName,
+                      count: result.receiveIds.length,
+                    })}
                     stickerIds={result.receiveIds}
                     selectedIds={selectedReceiveIds}
                     onToggle={toggleReceive}
                   />
                   <TradeSection
-                    title="What you can give"
-                    detail={`You have ${result.giveIds.length} stickers ${result.remoteName} needs.`}
+                    title={t(locale, "trade.section.give.title", {
+                      count: result.giveIds.length,
+                    })}
+                    detail={t(locale, "trade.section.give.detail", {
+                      name: remoteName,
+                      count: result.giveIds.length,
+                    })}
                     stickerIds={result.giveIds}
                     selectedIds={selectedGiveIds}
                     onToggle={toggleGive}
@@ -262,9 +294,9 @@ export function TradeDrawer({
                 </>
               )}
 
-              {applyError && (
+              {applyErrorKey && (
                 <p className="rounded-sm border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                  {applyError}
+                  {t(locale, applyErrorKey)}
                 </p>
               )}
             </div>
@@ -278,7 +310,7 @@ export function TradeDrawer({
                   className="w-full shadow-none"
                   onClick={() => setStep("scan")}
                 >
-                  Scan another QR
+                  {t(locale, "trade.scanAnother")}
                 </Button>
               ) : (
                 <AlertDialog>
@@ -294,17 +326,27 @@ export function TradeDrawer({
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Confirm Trade?</AlertDialogTitle>
+                      <AlertDialogTitle>
+                        {t(locale, "trade.confirm.dialogTitle")}
+                      </AlertDialogTitle>
                       <AlertDialogDescription>
-                        Review the sticker count changes before updating your album.
+                        {t(locale, "trade.confirm.dialogDescription")}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
 
                     <div className="space-y-3 text-sm">
-                      <SummaryList title="You'll receive" ids={selectedReceiveIds} />
-                      <SummaryList title="You'll give" ids={selectedGiveIds} />
+                      <SummaryList
+                        title={t(locale, "trade.summary.receive")}
+                        ids={selectedReceiveIds}
+                      />
+                      <SummaryList
+                        title={t(locale, "trade.summary.give")}
+                        ids={selectedGiveIds}
+                      />
                       <div>
-                        <p className="font-medium">Album impact</p>
+                        <p className="font-medium">
+                          {t(locale, "trade.albumImpact")}
+                        </p>
                         <div className="mt-1 max-h-32 space-y-1 overflow-y-auto rounded-sm border p-2 text-xs text-muted-foreground">
                           {impact.map((item) => (
                             <p key={item.id}>
@@ -318,7 +360,7 @@ export function TradeDrawer({
                     <AlertDialogFooter>
                       <AlertDialogCancel asChild>
                         <Button variant="secondary" className="shadow-none">
-                          Cancel
+                          {t(locale, "common.cancel")}
                         </Button>
                       </AlertDialogCancel>
                       <AlertDialogAction asChild>
@@ -374,9 +416,7 @@ function TradeSection({
     <section className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">
-            {title} {selectedIds.length}
-          </h3>
+          <h3 className="text-sm font-semibold">{title}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
         </div>
         <span className="shrink-0 text-xs font-medium text-primary">
@@ -415,17 +455,17 @@ function toggleId(ids: string[], id: string) {
     : [...ids, id];
 }
 
-function getTradeParseMessage(reason: TradeQrParseError) {
+function getTradeParseMessageKey(reason: TradeQrParseError): TradeMessageKey {
   switch (reason) {
     case "invalid-collection":
     case "invalid-length":
     case "invalid-hash":
-      return "This QR was created for a different StickerOS collection.";
+      return "trade.error.invalidCollection";
     case "invalid-version":
-      return "This QR was created by an unsupported StickerOS trade version.";
+      return "trade.error.invalidVersion";
     case "invalid-bitset":
-      return "This QR contains unreadable collection data.";
+      return "trade.error.invalidBitset";
     default:
-      return "This does not look like a valid StickerOS trade QR.";
+      return "trade.error.invalidQr";
   }
 }

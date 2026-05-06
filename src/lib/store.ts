@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { starterCollection, stickerGroups, stickers } from "@/lib/sticker-data";
+import type { Locale } from "@/lib/i18n";
 import {
   applyTradeToCollection,
   canApplyTrade,
@@ -16,6 +17,7 @@ export type Settings = {
   compactMode: boolean;
   animations: boolean;
   theme: ThemePreference;
+  locale: Locale;
 };
 
 const STORAGE_KEY = "stickeros-collection-v1";
@@ -24,6 +26,7 @@ const defaultSettings: Settings = {
   compactMode: false,
   animations: true,
   theme: "system",
+  locale: "en",
 };
 
 type CollectionStats = {
@@ -130,6 +133,19 @@ export const useStickerStore = create<StickerOSState>()(
       name: STORAGE_KEY,
       version: 1,
       storage: createJSONStorage(() => localStorage),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<StickerOSState> | undefined;
+
+        return {
+          ...currentState,
+          ...persisted,
+          settings: {
+            ...defaultSettings,
+            ...persisted?.settings,
+            locale: persisted?.settings?.locale ?? defaultSettings.locale,
+          },
+        };
+      },
 
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
