@@ -90,50 +90,6 @@ body {
   overscroll-behavior-y: contain;
 }
 
-:root {
-  --duration-exit: 150ms;
-  --duration-enter: 210ms;
-  --duration-move: 320ms;
-}
-
-@keyframes vt-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes vt-settle {
-  from {
-    transform: translateY(8px);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-html.sticker-grid-view-transition-active::view-transition-old(root),
-html.sticker-grid-view-transition-active::view-transition-new(root),
-html.sticker-grid-view-transition-active::view-transition-group(root) {
-  animation: none;
-}
-
-html.sticker-grid-view-transition-active::view-transition-group(sticker-results) {
-  animation-duration: var(--duration-move);
-}
-
-html.sticker-grid-view-transition-active::view-transition-old(sticker-results) {
-  animation: var(--duration-exit) ease-out both vt-fade reverse;
-}
-
-html.sticker-grid-view-transition-active::view-transition-new(sticker-results) {
-  animation:
-    var(--duration-enter) ease-out var(--duration-exit) both vt-fade,
-    var(--duration-move) ease-out both vt-settle;
-}
-
 html {
   scroll-padding-top: 8rem;
 }
@@ -159,13 +115,63 @@ input {
   display: none;
 }
 
+.tabs-content-wrapper {
+  overflow: hidden;
+  background: var(--background);
+}
+
+.tabs-content {
+  background: var(--background);
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+.tabs-content-active {
+  animation-duration: 700ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
+
+.tabs-content-active[data-direction="right"] {
+  animation-name: tabContentSlideFromRight;
+}
+
+.tabs-content-active[data-direction="left"] {
+  animation-name: tabContentSlideFromLeft;
+}
+
+@keyframes tabContentSlideFromRight {
+  from {
+    opacity: 0;
+    transform: translate3d(-100%, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes tabContentSlideFromLeft {
+  from {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .lazy-sticker-grid-ready {
   opacity: 0;
   transform: translateY(0.375rem);
   transition-delay: var(--lazy-section-delay, 0ms);
   transition-duration: 300ms;
   transition-property: opacity, transform;
-  transition-timing-function: ease-out;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lazy-sticker-grid-entered {
@@ -174,11 +180,9 @@ input {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(*),
-  ::view-transition-new(*),
-  ::view-transition-group(*) {
-    animation-duration: 0s !important;
-    animation-delay: 0s !important;
+  .tabs-content-active {
+    animation: none;
+    will-change: auto;
   }
 
   .lazy-sticker-grid-ready {

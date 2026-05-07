@@ -70,6 +70,7 @@ type AlbumTab = "all" | "missing" | "duplicates" | "special";
 type SortMode = "grouped" | "az";
 type StatsTab = "summary" | "teams";
 type TeamSortMode = "most" | "least";
+type TabTransitionDirection = "left" | "right";
 
 const albumTabs = [
   { id: "all", labelKey: "album.tab.all" },
@@ -84,67 +85,17 @@ const albumTabs = [
 const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
-type StartViewTransitionResult = {
-  finished: Promise<unknown>;
-};
-
-type DocumentWithViewTransition = Document & {
-  startViewTransition?: (updateCallback: () => void) => StartViewTransitionResult;
-};
-
-let activeGridViewTransitions = 0;
-
-function runViewTransition(update: () => void) {
-  if (typeof document === "undefined" || typeof window === "undefined") {
-    update();
-    return;
-  }
-
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    update();
-    return;
-  }
-
-  const doc = document as DocumentWithViewTransition;
-  if (typeof doc.startViewTransition !== "function") {
-    update();
-    return;
-  }
-
-  const root = document.documentElement;
-  const activate = () => {
-    if (activeGridViewTransitions === 0) {
-      root.classList.add("sticker-grid-view-transition-active");
-    }
-    activeGridViewTransitions += 1;
-  };
-  const deactivate = () => {
-    activeGridViewTransitions = Math.max(0, activeGridViewTransitions - 1);
-    if (activeGridViewTransitions === 0) {
-      root.classList.remove("sticker-grid-view-transition-active");
-    }
-  };
-
-  try {
-    activate();
-    const transition = doc.startViewTransition(update);
-    void transition.finished.finally(() => {
-      deactivate();
-    });
-  } catch {
-    deactivate();
-    update();
-  }
-}
-
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [statsOpen, setStatsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
   const [tradeOpen, setTradeOpen] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<AlbumTab>("all");
   const [visitedTabs, setVisitedTabs] = React.useState<AlbumTab[]>(["all"]);
   const [sortMode, setSortMode] = React.useState<SortMode>("grouped");
+  const [activeTab, setActiveTab] = React.useState<AlbumTab>("all");
+  const [tabTransitionDirection, setTabTransitionDirection] =
+    React.useState<TabTransitionDirection>("right");
+  const [hasChangedTab, setHasChangedTab] = React.useState(false);
   const [duplicateEditorSticker, setDuplicateEditorSticker] =
     React.useState<Sticker | null>(null);
   const [shareState, setShareState] = React.useState<
@@ -158,7 +109,6 @@ export function StickerOSApp() {
   const setQuery = useStickerStore((state) => state.setSearchQuery);
   const locale = useStickerStore((state) => state.settings.locale);
   const stats = useCollectionStats();
-  const deferredActiveTab = React.useDeferredValue(activeTab);
 
   const handleEditDuplicates = React.useCallback((sticker: Sticker) => {
     setDuplicateEditorSticker(sticker);
@@ -180,23 +130,22 @@ export function StickerOSApp() {
     setStatsOpen(true);
   }, []);
   const handleSortToggle = React.useCallback(() => {
-    runViewTransition(() => {
-      setSortMode((mode) => (mode === "grouped" ? "az" : "grouped"));
-    });
+    setSortMode((mode) => (mode === "grouped" ? "az" : "grouped"));
   }, []);
 
   const handleTabChange = React.useCallback((tab: AlbumTab) => {
     if (tab === activeTab) return;
 
-    runViewTransition(() => {
-      setVisitedTabs((tabs) =>
-        tabs.includes(tab) ? tabs : [...tabs, tab],
-      );
-      setActiveTab(tab);
-    });
-  }, [activeTab]);
+    const currentIndex = albumTabs.findIndex((item) => item.id === activeTab);
+    const nextIndex = albumTabs.findIndex((item) => item.id === tab);
 
-  const isGridPending = activeTab !== deferredActiveTab;
+    setTabTransitionDirection(
+      nextIndex > currentIndex ? "right" : "left",
+    );
+    setVisitedTabs((tabs) => (tabs.includes(tab) ? tabs : [...tabs, tab]));
+    setActiveTab(tab);
+    setHasChangedTab(true);
+  }, [activeTab]);
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -221,22 +170,19 @@ export function StickerOSApp() {
           onTabChange={handleTabChange}
         />
 
-        <section
-          className={cn(
-            "pt-4 transition-opacity duration-150",
-            isGridPending && "opacity-70",
-          )}
-        >
+        <section className="tabs-content-wrapper min-h-[calc(100dvh-8rem)] bg-background pt-4">
           {visitedTabs.map((tab) => (
             <AlbumTabPanel
               key={tab}
               tab={tab}
-              active={tab === deferredActiveTab}
+              active={tab === activeTab}
+              direction={tabTransitionDirection}
               collectionByStickerId={collectionByStickerId}
               locale={locale}
               query={query}
               sortMode={sortMode}
               onEditDuplicates={handleEditDuplicates}
+              hasChangedTab={hasChangedTab}
             />
           ))}
         </section>
@@ -514,19 +460,23 @@ const AlbumTabPanel = React.memo(
   function AlbumTabPanel({
     tab,
     active,
+    direction,
     collectionByStickerId,
     locale,
     query,
     sortMode,
     onEditDuplicates,
+    hasChangedTab,
   }: {
     tab: AlbumTab;
     active: boolean;
+    direction: TabTransitionDirection;
     collectionByStickerId: Record<string, number>;
     locale: Locale;
     query: string;
     sortMode: SortMode;
     onEditDuplicates: (sticker: Sticker) => void;
+    hasChangedTab: boolean;
   }) {
     const sections = React.useMemo(
       () =>
@@ -543,8 +493,11 @@ const AlbumTabPanel = React.memo(
     return (
       <section
         hidden={!active}
-        className="space-y-4"
-        style={active ? { viewTransitionName: "sticker-results" } : undefined}
+        data-direction={direction}
+        className={cn(
+          "tabs-content space-y-4 bg-background",
+          active && hasChangedTab ? "tabs-content-active" : "",
+        )}
       >
         {sections.map(
           (
@@ -688,11 +641,22 @@ function useLazySection(enabled: boolean) {
     });
   }, [enter]);
 
+  const reveal = React.useCallback((animate: boolean) => {
+    if (revealedRef.current) return;
+
+    revealedRef.current = true;
+    setShouldRender(true);
+
+    if (!animate) {
+      setEnter(true);
+    }
+  }, []);
+
   useIsomorphicLayoutEffect(() => {
-    if (!enabled || !shouldRender) return;
+    if (!enabled || !shouldRender || enter) return;
 
     scheduleEnter();
-  }, [enabled, scheduleEnter, shouldRender]);
+  }, [enabled, enter, scheduleEnter, shouldRender]);
 
   useIsomorphicLayoutEffect(() => {
     const node = ref.current;
@@ -703,15 +667,8 @@ function useLazySection(enabled: boolean) {
       return;
     }
 
-    const reveal = () => {
-      if (revealedRef.current) return;
-
-      revealedRef.current = true;
-      setShouldRender(true);
-    };
-
     if (typeof IntersectionObserver === "undefined") {
-      reveal();
+      reveal(false);
       return;
     }
 
@@ -722,7 +679,7 @@ function useLazySection(enabled: boolean) {
       rect.top <= window.innerHeight + rootMargin;
 
     if (withinMargin) {
-      reveal();
+      reveal(false);
       return;
     }
 
@@ -730,7 +687,7 @@ function useLazySection(enabled: boolean) {
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
 
-        reveal();
+        reveal(true);
         observer.disconnect();
 
         if (observerRef.current === observer) {
@@ -749,7 +706,7 @@ function useLazySection(enabled: boolean) {
         observerRef.current = null;
       }
     };
-  }, [enabled, shouldRender]);
+  }, [enabled, reveal, shouldRender]);
 
   React.useEffect(
     () => () => {
