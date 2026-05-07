@@ -16,7 +16,7 @@ type ScannerMessageKey =
 export function TradeScanner({
   onScan,
 }: {
-  onScan: (value: string) => void;
+  onScan: (value: string) => void | Promise<void>;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const scannerRef = React.useRef<import("qr-scanner").default | null>(null);

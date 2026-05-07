@@ -9,7 +9,7 @@ export const TRADE_COLLECTION_ID = "stickeros-fwc26";
 export const TRADE_DISPLAY_NAME_MAX_LENGTH = 48;
 export const TRADE_BITSET_BYTE_LENGTH = Math.ceil(stickers.length / 8);
 export const TRADE_DATASET_HASH = hashStickerIds(
-  stickers.map((sticker) => sticker.id),
+  getStickerOsOrderedStickers().map((sticker) => sticker.id),
 );
 
 export type TradeQrPayloadV1 = {
@@ -130,9 +130,9 @@ function isTradeQrPayloadShape(value: unknown): value is TradeQrPayloadV1 {
 function encodeStickerBitset(matches: (stickerId: string) => boolean) {
   const bytes = new Uint8Array(TRADE_BITSET_BYTE_LENGTH);
 
-  stickers.forEach((sticker, index) => {
+  getStickerOsOrderedStickers().forEach((sticker) => {
     if (!matches(sticker.id)) return;
-    bytes[Math.floor(index / 8)] |= 1 << index % 8;
+    bytes[Math.floor(sticker.stickerOsIndex / 8)] |= 1 << sticker.stickerOsIndex % 8;
   });
 
   return bytesToBase64Url(bytes);
@@ -153,10 +153,10 @@ function decodeStickerBitset(value: string) {
     return null;
   }
 
-  return stickers
-    .filter((_, index) => {
-      const byte = bytes[Math.floor(index / 8)];
-      return (byte & (1 << index % 8)) !== 0;
+  return getStickerOsOrderedStickers()
+    .filter((sticker) => {
+      const byte = bytes[Math.floor(sticker.stickerOsIndex / 8)];
+      return (byte & (1 << sticker.stickerOsIndex % 8)) !== 0;
     })
     .map((sticker) => sticker.id);
 }
@@ -209,4 +209,8 @@ function hashStickerIds(ids: string[]) {
   return `${hashA.toString(16).padStart(8, "0")}${hashB
     .toString(16)
     .padStart(8, "0")}`;
+}
+
+function getStickerOsOrderedStickers() {
+  return [...stickers].sort((a, b) => a.stickerOsIndex - b.stickerOsIndex);
 }

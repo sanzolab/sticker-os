@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n";
+import { stickerToIndex } from "@/lib/stickeros/album";
 
 export type StickerCategory = "fwc" | "cc" | "country";
 export type StickerKind =
@@ -24,6 +25,7 @@ export type StickerGroup = {
 
 export type Sticker = {
   id: string;
+  stickerOsIndex: number;
   number: string;
   code: string;
   title: string;
@@ -478,7 +480,7 @@ const countryGroups: StickerGroup[] = [
   },
 ];
 
-export const stickerGroups = [...fwcGroups, ...ccGroups, ...countryGroups];
+export const stickerGroups = [...fwcGroups, ...countryGroups, ...ccGroups];
 export const sectionOrder = stickerGroups.map((group) => group.id);
 export const stickerGroupsById = Object.fromEntries(
   stickerGroups.map((group) => [group.id, group]),
@@ -559,6 +561,7 @@ function makeFwcSticker(
 ): Sticker {
   return {
     id: `${group.id}-${number}`,
+    stickerOsIndex: getStickerOsIndex(`FWC ${number}`),
     number,
     code: `${group.exportLabel} ${number}`,
     title: `${group.label} ${number}`,
@@ -587,6 +590,7 @@ const ccStickers: Sticker[] = Array.from({ length: 14 }, (_, index) => {
   const number = `${index + 1}`;
   return {
     id: `CC${number}`,
+    stickerOsIndex: getStickerOsIndex(`CC ${number}`),
     number,
     code: `CC${number}`,
     title: `CC sponsor ${number}`,
@@ -607,6 +611,7 @@ const countryStickers: Sticker[] = countryGroups.flatMap((group) =>
 
     return {
       id: `${group.countryCode}${number}`,
+      stickerOsIndex: getStickerOsIndex(`${group.countryCode} ${number}`),
       number,
       code: `${group.countryCode}${number}`,
       title:
@@ -629,12 +634,15 @@ const countryStickers: Sticker[] = countryGroups.flatMap((group) =>
 
 export const stickers: Sticker[] = [
   ...fwcStickers,
-  ...ccStickers,
   ...countryStickers,
+  ...ccStickers,
 ];
 
 export const stickersById = Object.fromEntries(
   stickers.map((sticker) => [sticker.id, sticker]),
+);
+export const stickersByStickerOsIndex = Object.fromEntries(
+  stickers.map((sticker) => [sticker.stickerOsIndex, sticker]),
 );
 
 export const starterCollection: Record<string, number> = {};
@@ -664,4 +672,8 @@ export function getGroupedStickers(items = stickers) {
       stickers: items.filter((sticker) => sticker.groupId === group.id),
     }))
     .filter((section) => section.stickers.length > 0);
+}
+
+function getStickerOsIndex(code: string) {
+  return stickerToIndex(code);
 }

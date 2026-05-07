@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import QRCode from "react-qr-code";
 import { ArrowLeft, ScanLine } from "lucide-react";
 import {
@@ -22,7 +23,7 @@ import {
   DrawerDescription,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { stickersById } from "@/lib/sticker-data";
+import { stickers, stickersById, stickersByStickerOsIndex } from "@/lib/sticker-data";
 import { useStickerStore } from "@/lib/store";
 import {
   buildTradeMatches,
@@ -31,10 +32,8 @@ import {
   previewTradeImpact,
 } from "@/lib/trade";
 import {
-  buildTradeQrPayload,
   parseTradeQrPayload,
   sanitizeTradeDisplayName,
-  serializeTradeQrPayload,
   type TradeQrParseError,
 } from "@/lib/trade-qr";
 import { t } from "@/lib/i18n";
@@ -72,6 +71,7 @@ export function TradeDrawer({
   const [applyErrorKey, setApplyErrorKey] =
     React.useState<TradeMessageKey | null>(null);
   const [result, setResult] = React.useState<TradeResult | null>(null);
+  const [qrValue, setQrValue] = React.useState("");
   const [selectedReceiveIds, setSelectedReceiveIds] = React.useState<string[]>([]);
   const [selectedGiveIds, setSelectedGiveIds] = React.useState<string[]>([]);
 
@@ -83,13 +83,27 @@ export function TradeDrawer({
   const applyTrade = useStickerStore((state) => state.applyTrade);
 
   const displayName = sanitizeTradeDisplayName(collectionName);
-  const qrValue = React.useMemo(
-    () =>
-      serializeTradeQrPayload(
-        buildTradeQrPayload(collectionName, collectionByStickerId),
-      ),
-    [collectionByStickerId, collectionName],
+  const stickerOsIndexes = React.useMemo(
+    () => getStickerOsIndexesFromCollection(collectionByStickerId),
+    [collectionByStickerId],
   );
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadQr() {
+      try {
+        const qr = await requestStickerOsQrEncode(stickerOsIndexes, controller.signal);
+        setQrValue(qr);
+      } catch {
+        if (!controller.signal.aborted) setQrValue("");
+      }
+    }
+
+    void loadQr();
+
+    return () => controller.abort();
+  }, [stickerOsIndexes]);
 
   const resetFlow = React.useCallback(() => {
     setStep("entry");
@@ -106,23 +120,23 @@ export function TradeDrawer({
   };
 
   const handleScan = React.useCallback(
-    (value: string) => {
-      const parsed = parseTradeQrPayload(value);
+    async (value: string) => {
+      const parsed = await parseScannedTradeQr(value);
 
       if (!parsed.ok) {
-        setScanErrorKey(getTradeParseMessageKey(parsed.reason));
+        setScanErrorKey(parsed.errorKey);
         return;
       }
 
       const matches = buildTradeMatches({
         localMissingIds: getLocalMissingIds(collectionByStickerId),
         localDuplicateIds: getLocalDuplicateIds(collectionByStickerId),
-        remoteMissingIds: parsed.payload.missingIds,
-        remoteDuplicateIds: parsed.payload.duplicateIds,
+        remoteMissingIds: parsed.missingIds,
+        remoteDuplicateIds: parsed.duplicateIds,
       });
 
       setResult({
-        remoteName: parsed.payload.name || "",
+        remoteName: parsed.name || "",
         receiveIds: matches.receiveIds,
         giveIds: matches.giveIds,
       });
@@ -196,14 +210,35 @@ export function TradeDrawer({
               </DrawerDescription>
             </div>
 
-            <div className="mx-auto grid max-w-64 place-items-center rounded-sm border bg-white p-5">
-              <QRCode
-                value={qrValue}
-                size={224}
-                bgColor="#ffffff"
-                fgColor="#111827"
-                className="h-auto w-full"
-              />
+            <div className="relative mx-auto grid aspect-square w-full max-w-64 place-items-center rounded-sm border bg-white p-5">
+              {qrValue ? (
+                <>
+                  <QRCode
+                    value={qrValue}
+                    size={224}
+                    level="H"
+                    bgColor="#ffffff"
+                    fgColor="#111827"
+                    className="h-auto w-full"
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="flex aspect-square w-[20%] items-center justify-center rounded-sm bg-white  ring-1 ring-white">
+                      <Image
+                        src="/icon.svg"
+                        alt="StickerOS"
+                        width={40}
+                        height={40}
+                        unoptimized
+                        className="block h-4/5 w-4/5 select-none"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="grid aspect-square w-full place-items-center text-sm text-muted-foreground">
+                  Preparing QR...
+                </div>
+              )}
             </div>
 
             <Button
@@ -453,6 +488,119 @@ function toggleId(ids: string[], id: string) {
   return ids.includes(id)
     ? ids.filter((candidate) => candidate !== id)
     : [...ids, id];
+}
+
+type StickerOsIndexes = {
+  ownedIndexes: number[];
+  duplicateIndexes: number[];
+};
+
+type StickerOsDecodeResponse = {
+  format: "stickeros";
+  ownedIndexes: number[];
+  duplicateIndexes: number[];
+};
+
+type ParsedScannedTradeQr =
+  | {
+      ok: true;
+      name: string;
+      missingIds: string[];
+      duplicateIds: string[];
+    }
+  | {
+      ok: false;
+      errorKey: TradeMessageKey;
+    };
+
+function getStickerOsIndexesFromCollection(
+  collectionByStickerId: Record<string, number>,
+): StickerOsIndexes {
+  return {
+    ownedIndexes: stickers
+      .filter((sticker) => (collectionByStickerId[sticker.id] ?? 0) > 0)
+      .map((sticker) => sticker.stickerOsIndex),
+    duplicateIndexes: stickers
+      .filter((sticker) => (collectionByStickerId[sticker.id] ?? 0) > 1)
+      .map((sticker) => sticker.stickerOsIndex),
+  };
+}
+
+async function requestStickerOsQrEncode(
+  indexes: StickerOsIndexes,
+  signal: AbortSignal,
+) {
+  const response = await fetch("/api/stickeros/qr", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "encode",
+      ownedIndexes: indexes.ownedIndexes,
+      duplicateIndexes: indexes.duplicateIndexes,
+    }),
+    signal,
+  });
+
+  if (!response.ok) throw new Error("StickerOS QR encode failed");
+
+  const body = (await response.json()) as { qr?: string };
+  if (!body.qr) throw new Error("StickerOS QR response did not include qr");
+
+  return body.qr;
+}
+
+async function parseScannedTradeQr(value: string): Promise<ParsedScannedTradeQr> {
+  const stickerOs = await requestStickerOsQrDecode(value);
+
+  if (stickerOs.ok) {
+    const owned = new Set(stickerOs.payload.ownedIndexes);
+
+    return {
+      ok: true,
+      name: "",
+      missingIds: stickers
+        .filter((sticker) => !owned.has(sticker.stickerOsIndex))
+        .map((sticker) => sticker.id),
+      duplicateIds: stickerOs.payload.duplicateIndexes
+        .map((index) => stickersByStickerOsIndex[index]?.id)
+        .filter((id): id is string => Boolean(id)),
+    };
+  }
+
+  const legacy = parseTradeQrPayload(value);
+
+  if (!legacy.ok) {
+    return { ok: false, errorKey: getTradeParseMessageKey(legacy.reason) };
+  }
+
+  return {
+    ok: true,
+    name: legacy.payload.name,
+    missingIds: legacy.payload.missingIds,
+    duplicateIds: legacy.payload.duplicateIds,
+  };
+}
+
+async function requestStickerOsQrDecode(value: string): Promise<
+  | { ok: true; payload: StickerOsDecodeResponse }
+  | { ok: false }
+> {
+  try {
+    const response = await fetch("/api/stickeros/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "decode", qr: value }),
+    });
+
+    if (!response.ok) return { ok: false };
+
+    return {
+      ok: true,
+      payload: (await response.json()) as StickerOsDecodeResponse,
+    };
+  } catch {
+    return { ok: false };
+  }
 }
 
 function getTradeParseMessageKey(reason: TradeQrParseError): TradeMessageKey {

@@ -21,7 +21,7 @@ export type TradeImpactItem = {
 };
 
 const stickerOrder = new Map(
-  stickers.map((sticker, index) => [sticker.id, index]),
+  stickers.map((sticker) => [sticker.id, sticker.stickerOsIndex]),
 );
 
 export function buildTradeMatches({
