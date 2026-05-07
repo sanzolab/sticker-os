@@ -1,9 +1,9 @@
-import React from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type DataGridItem = {
   label: string;
-  value: React.ReactNode;
+  value: ReactNode;
 };
 
 type DataGridProps = {
@@ -11,7 +11,7 @@ type DataGridProps = {
   cols?: number;
   className?: string;
   cellClassName?: string;
-  renderCell?: (item: DataGridItem, index: number) => React.ReactNode;
+  renderCell?: (item: DataGridItem, index: number) => ReactNode;
 };
 
 export function DataGrid({

@@ -1,3 +1,5 @@
+"use client";
+
 import { stickersById } from "@/lib/sticker-data";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";

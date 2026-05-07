@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImageUp, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
@@ -18,16 +18,16 @@ export function TradeScanner({
 }: {
   onScan: (value: string) => void | Promise<void>;
 }) {
-  const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const scannerRef = React.useRef<import("qr-scanner").default | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const scannedRef = React.useRef(false);
-  const [status, setStatus] = React.useState<ScannerStatus>("loading");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scannerRef = useRef<import("qr-scanner").default | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scannedRef = useRef(false);
+  const [status, setStatus] = useState<ScannerStatus>("loading");
   const [messageKey, setMessageKey] =
-    React.useState<ScannerMessageKey>("scanner.message.preparing");
+    useState<ScannerMessageKey>("scanner.message.preparing");
   const locale = useStickerStore((state) => state.settings.locale);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let cancelled = false;
 
     async function startScanner() {

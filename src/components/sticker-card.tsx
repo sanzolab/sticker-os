@@ -1,8 +1,10 @@
+"use client";
+
 import { getVisualStateFromCopies } from "@/lib/getVisualStateFromCopies";
 import { Sticker } from "@/lib/sticker-data";
 import { useStickerStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import React, { memo } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 
 export const StickerCard = memo(function StickerCard({
   sticker,
@@ -19,21 +21,19 @@ export const StickerCard = memo(function StickerCard({
   const removeSticker = useStickerStore((state) => state.removeSticker);
   const animations = useStickerStore((state) => state.settings.animations);
 
-  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const longPressed = React.useRef(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
 
   const state = getVisualStateFromCopies(copies, sticker);
 
-  React.useEffect(
+  useEffect(
     () => () => {
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
     },
     [],
   );
 
-  const beginPress = React.useCallback(() => {
+  const beginPress = useCallback(() => {
     longPressed.current = false;
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
     longPressTimer.current = setTimeout(() => {
@@ -44,14 +44,14 @@ export const StickerCard = memo(function StickerCard({
     }, 450);
   }, [copies, onEditDuplicates, removeSticker, sticker]);
 
-  const endPress = React.useCallback(() => {
+  const endPress = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
   }, []);
 
-  const handleClick = React.useCallback(() => {
+  const handleClick = useCallback(() => {
     if (longPressed.current) return;
     tapSticker(sticker.id);
   }, [sticker.id, tapSticker]);

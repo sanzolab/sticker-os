@@ -62,10 +62,12 @@ export function buildMissingTxtExport(
   collectionByStickerId: CollectionByStickerId,
   locale: Locale,
 ) {
+  const rows = buildMissingRows(collectionByStickerId, locale);
+  const hasMissing = rows.length > 0;
   return buildTxtExport(locale, collectionName, [
     {
-      title: t(locale, "export.txt.missingSection"),
-      rows: buildMissingRows(collectionByStickerId, locale),
+      title: hasMissing ? t(locale, "export.txt.missingSection") : t(locale, "export.txt.missingSectionVoid"),
+      rows: hasMissing ? rows : [],
     },
   ]);
 }
@@ -75,27 +77,34 @@ export function buildDuplicatesTxtExport(
   collectionByStickerId: CollectionByStickerId,
   locale: Locale,
 ) {
+  const rows = buildDuplicateRows(collectionByStickerId, locale);
+  const hasDuplicates = rows.length > 0;
   return buildTxtExport(locale, collectionName, [
     {
-      title: t(locale, "export.txt.duplicatesSection"),
-      rows: buildDuplicateRows(collectionByStickerId, locale),
+      title: hasDuplicates ? t(locale, "export.txt.duplicatesSection") : t(locale, "export.txt.duplicatesSectionVoid"),
+      rows: hasDuplicates ? rows : [],
     },
   ]);
 }
+
 
 export function buildCombinedTxtExport(
   collectionName: string,
   collectionByStickerId: CollectionByStickerId,
   locale: Locale,
 ) {
+  const missingRows = buildMissingRows(collectionByStickerId, locale);
+  const duplicateRows = buildDuplicateRows(collectionByStickerId, locale);
+  const hasMissing = missingRows.length > 0;
+  const hasDuplicates = duplicateRows.length > 0;
   return buildTxtExport(locale, collectionName, [
     {
-      title: t(locale, "export.txt.missingSection"),
-      rows: buildMissingRows(collectionByStickerId, locale),
+      title: hasMissing ? t(locale, "export.txt.missingSection") : t(locale, "export.txt.missingSectionVoid"),
+      rows: hasMissing ? missingRows : [],
     },
     {
-      title: t(locale, "export.txt.duplicatesSection"),
-      rows: buildDuplicateRows(collectionByStickerId, locale),
+      title: hasDuplicates ? t(locale, "export.txt.duplicatesSection") : t(locale, "export.txt.duplicatesSectionVoid"),
+      rows: hasDuplicates ? duplicateRows : [],
     },
   ]);
 }

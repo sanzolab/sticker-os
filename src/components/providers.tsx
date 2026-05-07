@@ -1,11 +1,11 @@
 "use client";
 
-import * as React from "react";
+import { useEffect, type ReactNode } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { useStickerStore } from "@/lib/store";
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  React.useEffect(() => {
+export function Providers({ children }: { children: ReactNode }) {
+  useEffect(() => {
     useStickerStore.persist.rehydrate();
   }, []);
   return (
