@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { CollectionHeader } from "@/components/collection-header";
 import { DuplicateEditor } from "@/components/duplicate-editor";
 import { AlbumTabPanel } from "@/components/album-tab-panel";
+import { AddStickersDrawer } from "@/components/features/add-stickers/add-stickers-drawer";
 import { ShareDrawer } from "@/components/share-drawer";
 import { SettingsDrawer } from "@/components/settings-drawer";
 import { StatsDrawer } from "@/components/stats-drawer";
@@ -11,6 +12,7 @@ import { StickyControls, albumTabs, type AlbumTab } from "@/components/sticky-co
 import { TopBar, type ShareState } from "@/components/top-bar";
 import { TradeDrawer } from "@/components/trade-drawer";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
+import { useAddStickersPendingStore } from "@/components/features/add-stickers/add-stickers-session";
 import type { Sticker } from "@/lib/sticker-data";
 
 type SortMode = "grouped" | "az";
@@ -18,6 +20,7 @@ type TabTransitionDirection = "left" | "right";
 
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [addStickersOpen, setAddStickersOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -39,6 +42,9 @@ export function StickerOSApp() {
   const setQuery = useStickerStore((state) => state.setSearchQuery);
   const locale = useStickerStore((state) => state.settings.locale);
   const stats = useCollectionStats();
+  const pendingAddStickersCount = useAddStickersPendingStore(
+    (state) => state.candidates.length,
+  );
 
   const handleEditDuplicates = useCallback((sticker: Sticker) => {
     setDuplicateEditorSticker(sticker);
@@ -50,6 +56,10 @@ export function StickerOSApp() {
 
   const handleShareOpen = useCallback(() => {
     setShareOpen(true);
+  }, []);
+
+  const handleAddStickersOpen = useCallback(() => {
+    setAddStickersOpen(true);
   }, []);
 
   const handleTradeOpen = useCallback(() => {
@@ -90,7 +100,9 @@ export function StickerOSApp() {
       <TopBar
         collectionName={collectionName}
         shareState={shareState}
+        pendingAddStickersCount={pendingAddStickersCount}
         onShare={handleShareOpen}
+        onAddStickers={handleAddStickersOpen}
         onTrade={handleTradeOpen}
         onSettings={handleSettingsOpen}
       />
@@ -146,6 +158,10 @@ export function StickerOSApp() {
         collectionName={collectionName}
         collectionByStickerId={collectionByStickerId}
         onShareStateChange={setShareState}
+      />
+      <AddStickersDrawer
+        open={addStickersOpen}
+        onOpenChange={setAddStickersOpen}
       />
       <TradeDrawer open={tradeOpen} onOpenChange={setTradeOpen} />
       <StatsDrawer

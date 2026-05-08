@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AnimatedTabPanel } from "@/components/ui/animated-tab-panel";
-import { AnimatedTabs } from "@/components/ui/animated-tabs";
+import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { Button } from "@/components/ui/button";
 import { DataGrid } from "@/components/data-grid";
@@ -16,6 +16,7 @@ import { TeamProgressRow } from "./team-progress-row";
 
 type StatsTab = "summary" | "teams";
 type TeamSortMode = "most" | "least";
+const statsTabs = ["summary", "teams"] as const satisfies readonly StatsTab[];
 
 export function StatsDrawer({
   open,
@@ -29,12 +30,32 @@ export function StatsDrawer({
   stats: ReturnType<typeof useCollectionStats>;
 }) {
   const [activeTab, setActiveTab] = useState<StatsTab>("summary");
+  const [tabDirection, setTabDirection] = useState<"left" | "right">("right");
   const [teamSort, setTeamSort] = useState<TeamSortMode>("most");
   const locale = useStickerStore((state) => state.settings.locale);
   const items = useMemo(
     () => (open ? mapStatsToItems(locale, stats) : []),
     [locale, open, stats],
   );
+  const tabs = useMemo(
+    () => [
+      { id: "summary", label: t(locale, "stats.tabs.summary") },
+      { id: "teams", label: t(locale, "stats.tabs.teams") },
+    ] satisfies readonly AnimatedTabItem<StatsTab>[],
+    [locale],
+  );
+
+  const handleTabChange = useCallback((nextTab: StatsTab) => {
+    setActiveTab((currentTab) => {
+      if (currentTab === nextTab) return currentTab;
+
+      const currentIndex = statsTabs.indexOf(currentTab);
+      const nextIndex = statsTabs.indexOf(nextTab);
+
+      setTabDirection(nextIndex > currentIndex ? "right" : "left");
+      return nextTab;
+    });
+  }, []);
 
   const teamProgress = useMemo(
     () =>
@@ -69,12 +90,9 @@ export function StatsDrawer({
       </div>
 
       <AnimatedTabs
-        tabs={[
-          { id: "summary", label: t(locale, "stats.tabs.summary") },
-          { id: "teams", label: t(locale, "stats.tabs.teams") },
-        ]}
+        tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         className="grid-cols-2"
         tabClassName="relative h-10 capitalize text-muted-foreground"
         activeTabClassName="text-primary"
@@ -82,6 +100,7 @@ export function StatsDrawer({
 
       <AnimatedTabPanel
         active={activeTab === "summary"}
+        direction={tabDirection}
         className="space-y-3"
       >
         <ProgressRow
@@ -106,7 +125,11 @@ export function StatsDrawer({
         />
       </AnimatedTabPanel>
 
-      <AnimatedTabPanel active={activeTab === "teams"} className="space-y-3">
+      <AnimatedTabPanel
+        active={activeTab === "teams"}
+        direction={tabDirection}
+        className="space-y-3"
+      >
         <Button
           variant="outline"
           size="sm"

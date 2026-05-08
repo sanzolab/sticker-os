@@ -16,6 +16,7 @@ const translations = {
     "common.system": "System",
     "common.english": "English",
     "common.spanish": "Spanish",
+    "topbar.addStickersAria": "Add stickers",
     "topbar.shareAria": "Open share options",
     "topbar.tradeAria": "Open sticker trade",
     "topbar.settingsAria": "Open settings",
@@ -137,6 +138,78 @@ const translations = {
       "Your duplicates changed. Review this trade before trying again.",
     "trade.error.invalidSelection":
       "Select at least one sticker to receive and one to give.",
+    "addStickers.badge": "Quick capture",
+    "addStickers.title": "Add stickers",
+    "addStickers.description":
+      "Add several stickers quickly using a photo or voice.",
+    "addStickers.photo.title": "Photo",
+    "addStickers.photo.description":
+      "Take or upload a photo where sticker numbers and codes are visible.",
+    "addStickers.photo.button": "Choose photo",
+    "addStickers.voice.title": "Voice",
+    "addStickers.voice.description":
+      "Say several stickers in one sentence. You will review everything before adding.",
+    "addStickers.voice.example":
+      "Example: Mexico thirteen, Coca Cola fourteen, FWC zero zero.",
+    "addStickers.voice.start": "Start listening",
+    "addStickers.voice.stop": "Stop listening",
+    "addStickers.voice.analyzeTranscript": "Analyze transcript",
+    "addStickers.voice.retry": "Try again",
+    "addStickers.voice.upload": "Upload audio",
+    "addStickers.voice.listening": "Listening...",
+    "addStickers.voice.processing": "Processing voice locally first...",
+    "addStickers.voice.transcriptLabel": "Transcript",
+    "addStickers.voice.transcriptPlaceholder":
+      "Mexico thirteen, Coca Cola fourteen, FWC zero zero",
+    "addStickers.voice.unsupported":
+      "Voice recognition is not available in this browser. Try Photo or type the stickers manually.",
+    "addStickers.voice.permissionError":
+      "Microphone access was blocked or unavailable. Try Photo or type the stickers manually.",
+    "addStickers.voice.empty":
+      "No audio was captured. Try recording again or upload an audio file.",
+    "addStickers.voice.emptyTranscript":
+      "I did not catch any sticker text. Try again or type it manually.",
+    "addStickers.voice.recognitionError":
+      "I could not understand that voice input. Try again, use Photo, or type it manually.",
+    "addStickers.voice.offline":
+      "No internet connection. I could not understand this locally, and AI analysis requires internet.",
+    "addStickers.voice.connectionError":
+      "I could not reach AI analysis. Check your connection or provider settings, then try again.",
+    "addStickers.manual.label": "Or type them manually",
+    "addStickers.manual.placeholder": "MEX 13, CC14, FWC 00...",
+    "addStickers.manual.hint":
+      "Examples: MEX 13, CC14, FWC 00. Clear codes are parsed without AI.",
+    "addStickers.manual.submit": "Add",
+    "addStickers.loading.title": "Analyzing stickers",
+    "addStickers.loading.description":
+      "Checking this capture and matching it against the album.",
+    "addStickers.analyzing": "Analyzing...",
+    "addStickers.review.heading": "Confirm stickers",
+    "addStickers.review.provider": "Source: {provider}",
+    "addStickers.review.geminiAssisted": "Gemini assisted",
+    "addStickers.review.title": "Detected stickers",
+    "addStickers.review.description":
+      "Tap any sticker to choose whether it will be added.",
+    "addStickers.review.source": "From: {source}",
+    "addStickers.pending.review": "Review pending ({count})",
+    "addStickers.pending.reviewShort": "Review pending",
+    "addStickers.pending.discard": "Discard pending",
+    "addStickers.pending.captureMore": "Capture more",
+    "addStickers.pending.warning.title": "Pending stickers need review",
+    "addStickers.pending.warning.description":
+      "You have {count} stickers pending review. Resume that list or start a new capture and append more.",
+    "addStickers.pending.startNew": "Start new capture",
+    "addStickers.pending.sourceMixed": "mixed session",
+    "addStickers.unresolved.title": "Needs review",
+    "addStickers.empty.title": "No stickers found",
+    "addStickers.empty.description":
+      "Try a clearer code like MEX 13, FWC 00, or CC14.",
+    "addStickers.error.title": "Could not analyze stickers",
+    "addStickers.error.generic":
+      "Something went wrong while analyzing those stickers.",
+    "addStickers.back": "Back",
+    "addStickers.analyzeAnother": "Analyze another",
+    "addStickers.confirm": "Confirm add selected stickers ({count})",
     "scanner.message.preparing": "Preparing camera...",
     "scanner.message.ready": "Point the camera at a StickerOS trade QR.",
     "scanner.message.cameraUnavailable":
@@ -166,6 +239,7 @@ const translations = {
     "common.system": "Sistema",
     "common.english": "Inglés",
     "common.spanish": "Español",
+    "topbar.addStickersAria": "Agregar figuritas",
     "topbar.shareAria": "Abrir opciones para compartir",
     "topbar.tradeAria": "Abrir intercambio de figuritas",
     "topbar.settingsAria": "Abrir ajustes",
@@ -290,6 +364,78 @@ const translations = {
       "Tus repetidas cambiaron. Revisa este intercambio antes de intentarlo de nuevo.",
     "trade.error.invalidSelection":
       "Selecciona al menos una figurita para recibir y una para dar.",
+    "addStickers.badge": "Captura rápida",
+    "addStickers.title": "Agregar figuritas",
+    "addStickers.description":
+      "Agrega varias figuritas rápido usando una foto o la voz.",
+    "addStickers.photo.title": "Foto",
+    "addStickers.photo.description":
+      "Toma o sube una foto donde se vean los números y códigos de las figuritas.",
+    "addStickers.photo.button": "Elegir foto",
+    "addStickers.voice.title": "Voz",
+    "addStickers.voice.description":
+      "Di varias figuritas en una sola frase. Revisarás todo antes de agregar.",
+    "addStickers.voice.example":
+      "Ejemplo: México trece, Coca Cola catorce, FWC cero cero.",
+    "addStickers.voice.start": "Empezar a escuchar",
+    "addStickers.voice.stop": "Dejar de escuchar",
+    "addStickers.voice.analyzeTranscript": "Analizar transcripción",
+    "addStickers.voice.retry": "Intentar otra vez",
+    "addStickers.voice.upload": "Subir audio",
+    "addStickers.voice.listening": "Escuchando...",
+    "addStickers.voice.processing": "Procesando la voz localmente primero...",
+    "addStickers.voice.transcriptLabel": "Transcripción",
+    "addStickers.voice.transcriptPlaceholder":
+      "México trece, Coca Cola catorce, FWC cero cero",
+    "addStickers.voice.unsupported":
+      "El reconocimiento de voz no está disponible en este navegador. Prueba con Foto o escribe las figuritas manualmente.",
+    "addStickers.voice.permissionError":
+      "El acceso al micrófono fue bloqueado o no está disponible. Prueba con Foto o escribe las figuritas manualmente.",
+    "addStickers.voice.empty":
+      "No se capturó audio. Intenta grabar de nuevo o sube un archivo de audio.",
+    "addStickers.voice.emptyTranscript":
+      "No alcancé a detectar texto de figuritas. Intenta de nuevo o escríbelo manualmente.",
+    "addStickers.voice.recognitionError":
+      "No pude entender esa entrada de voz. Intenta de nuevo, usa Foto o escríbelo manualmente.",
+    "addStickers.voice.offline":
+      "No hay conexión a internet. No pude entenderlo localmente y el análisis con IA requiere internet.",
+    "addStickers.voice.connectionError":
+      "No pude conectar con el análisis de IA. Revisa tu conexión o la configuración del proveedor e intenta de nuevo.",
+    "addStickers.manual.label": "O escríbelas manualmente",
+    "addStickers.manual.placeholder": "MEX 13, CC14, FWC 00...",
+    "addStickers.manual.hint":
+      "Ejemplos: MEX 13, CC14, FWC 00. Los códigos claros se interpretan sin IA.",
+    "addStickers.manual.submit": "Agregar",
+    "addStickers.loading.title": "Analizando figuritas",
+    "addStickers.loading.description":
+      "Revisando esta captura y comparándola con el álbum.",
+    "addStickers.analyzing": "Analizando...",
+    "addStickers.review.heading": "Confirmar figuritas",
+    "addStickers.review.provider": "Fuente: {provider}",
+    "addStickers.review.geminiAssisted": "Asistido por Gemini",
+    "addStickers.review.title": "Figuritas detectadas",
+    "addStickers.review.description":
+      "Toca cualquier figurita para elegir si se agregará.",
+    "addStickers.review.source": "De: {source}",
+    "addStickers.pending.review": "Revisar pendientes ({count})",
+    "addStickers.pending.reviewShort": "Ver pendientes",
+    "addStickers.pending.discard": "Descartar pendientes",
+    "addStickers.pending.captureMore": "Capturar más",
+    "addStickers.pending.warning.title": "Tienes figuritas pendientes",
+    "addStickers.pending.warning.description":
+      "Hay {count} figuritas pendientes de revisión. Puedes retomar esa lista o iniciar una nueva captura y agregar más.",
+    "addStickers.pending.startNew": "Iniciar nueva captura",
+    "addStickers.pending.sourceMixed": "sesión mixta",
+    "addStickers.unresolved.title": "Requiere revisión",
+    "addStickers.empty.title": "No se encontraron figuritas",
+    "addStickers.empty.description":
+      "Prueba con un código más claro como MEX 13, FWC 00 o CC14.",
+    "addStickers.error.title": "No se pudieron analizar las figuritas",
+    "addStickers.error.generic":
+      "Algo salió mal al analizar esas figuritas.",
+    "addStickers.back": "Volver",
+    "addStickers.analyzeAnother": "Analizar otra",
+    "addStickers.confirm": "Confirmar figuritas seleccionadas ({count})",
     "scanner.message.preparing": "Preparando cámara...",
     "scanner.message.ready":
       "Apunta la cámara a un QR de intercambio de StickerOS.",

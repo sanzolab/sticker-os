@@ -1,6 +1,6 @@
 "use client";
 
-import { Repeat2, Settings, Share2 } from "lucide-react";
+import { Plus, Repeat2, Settings, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
@@ -10,13 +10,17 @@ export type ShareState = "idle" | "copied" | "downloaded";
 export function TopBar({
   collectionName,
   shareState,
+  pendingAddStickersCount,
   onShare,
+  onAddStickers,
   onTrade,
   onSettings,
 }: {
   collectionName: string;
   shareState: ShareState;
+  pendingAddStickersCount: number;
   onShare: () => void;
+  onAddStickers: () => void;
   onTrade: () => void;
   onSettings: () => void;
 }) {
@@ -29,6 +33,20 @@ export function TopBar({
           {collectionName}
         </button>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative size-10 rounded-sm shadow-none"
+            onClick={onAddStickers}
+            aria-label={t(locale, "topbar.addStickersAria")}
+          >
+            <Plus className="size-5" />
+            {pendingAddStickersCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                {pendingAddStickersCount}
+              </span>
+            )}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
