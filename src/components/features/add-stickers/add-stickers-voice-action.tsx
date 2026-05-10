@@ -313,6 +313,7 @@ export function AddStickersVoiceAction({
       };
 
       recognition.onerror = (event) => {
+        alert(`SR Error: ${event.error} | ${event.message ?? 'no message'}`);
         recognitionErrorRef.current = event.error;
         const serializedError = serializeSpeechRecognitionError(event);
         setDebug((current) => ({
