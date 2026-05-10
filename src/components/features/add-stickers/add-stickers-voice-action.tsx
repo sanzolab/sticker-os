@@ -104,7 +104,7 @@ export function AddStickersVoiceAction({
     setDebug((current) => ({ ...current, microphonePermission }));
   }
 
-  const startListening = async () => {
+const prepareCapture = async () => {
     if (onBeforeStartCapture) {
       const shouldStart = await onBeforeStartCapture();
       if (!shouldStart) return;
@@ -165,175 +165,9 @@ export function AddStickersVoiceAction({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const recorderMimeType = chooseRecorderMimeType();
-      const recorder = recorderMimeType
-        ? new MediaRecorder(stream, { mimeType: recorderMimeType })
-        : new MediaRecorder(stream);
-      recorderRef.current = recorder;
-      recorderEndedRef.current = false;
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      recorder.onstop = () => {
-        recorderEndedRef.current = true;
-        audioFileRef.current = buildRecordedAudioFile(audioChunksRef.current, recorder.mimeType);
-        setDebug((current) => ({
-          ...current,
-          recording: false,
-          fallbackAudioReady: Boolean(audioFileRef.current),
-          audioMimeType: recorder.mimeType || current.audioMimeType,
-          lastEvent: "mediaRecorder.onstop",
-        }));
-        void maybeSubmitVoice();
-      };
-
-      recorder.start();
-      setDebug((current) => ({
-        ...current,
-        recording: true,
-        audioMimeType: recorder.mimeType || recorderMimeType || "audio/webm",
-        lastEvent: "mediaRecorder.start",
-      }));
-
-      const context = new AudioContext();
-      audioContextRef.current = context;
-      const source = context.createMediaStreamSource(stream);
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-
-      analysisIntervalRef.current = setInterval(() => {
-        const activeAnalyser = analyserRef.current;
-        if (!activeAnalyser || finalizedRef.current) return;
-        recordingDurationRef.current += sampleEveryMs;
-        const rms = sampleRms(activeAnalyser);
-
-        if (rms < silenceThreshold) {
-          silenceDurationRef.current += sampleEveryMs;
-        } else {
-          silenceDurationRef.current = 0;
-        }
-
-        setDebug((current) => ({
-          ...current,
-          recordingDurationMs: recordingDurationRef.current,
-          silenceDurationMs: silenceDurationRef.current,
-        }));
-
-        if (silenceDurationRef.current >= silenceStopMs && !finalizedRef.current) {
-          void finishVoiceSession("silence-timeout", false);
-        }
-      }, sampleEveryMs);
-
-      maxDurationTimeoutRef.current = setTimeout(() => {
-        if (!finalizedRef.current) {
-          void finishVoiceSession("max-duration", false);
-        }
-      }, maxRecordingMs);
-
-      const recognition = new Recognition();
-      recognitionRef.current = recognition;
-      recognition.lang = getSpeechRecognitionLanguage(locale);
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 5;
-
-      recognition.onstart = () => {
-        setDebug((current) => ({
-          ...current,
-          lifecycleState: "listening",
-          lastEvent: "onstart",
-        }));
-      };
-
-      recognition.onaudiostart = () => {
-        setDebug((current) => ({
-          ...current,
-          audioStarted: true,
-          audioEnded: false,
-          lastEvent: "onaudiostart",
-        }));
-      };
-
-      recognition.onaudioend = () => {
-        setDebug((current) => ({
-          ...current,
-          audioEnded: true,
-          lastEvent: "onaudioend",
-        }));
-      };
-
-      recognition.onspeechstart = () => {
-        setDebug((current) => ({
-          ...current,
-          speechStarted: true,
-          speechEnded: false,
-          lastEvent: "onspeechstart",
-        }));
-      };
-
-      recognition.onspeechend = () => {
-        setDebug((current) => ({
-          ...current,
-          speechEnded: true,
-          lastEvent: "onspeechend",
-        }));
-      };
-
-      recognition.onresult = (event) => {
-        const alternatives = collectRawSpeechAlternatives(event);
-        const mergedAlternatives = mergeAlternatives(
-          alternativesRef.current,
-          alternatives,
-        );
-        alternativesRef.current = mergedAlternatives;
-        const transcriptViews = collectSpeechTranscriptViews(event);
-        finalTranscriptRef.current = transcriptViews.finalTranscript;
-        finalPrimaryConfidenceRef.current = transcriptViews.finalPrimaryConfidence;
-        setTranscript(transcriptViews.liveTranscript);
-        setDebug((current) => ({
-          ...current,
-          rawAlternatives: mergedAlternatives,
-          lastRawTranscript: mergedAlternatives.map((item) => item.transcript).join(" | "),
-          lastEvent: "onresult",
-        }));
-      };
-
-      recognition.onnomatch = (event) => {
-        const alternatives = collectRawSpeechAlternatives(event);
-        setDebug((current) => ({
-          ...current,
-          rawAlternatives: alternatives,
-          lastRawTranscript: alternatives.map((item) => item.transcript).join(" | "),
-          lastEvent: "onnomatch",
-        }));
-      };
-
-      recognition.onerror = (event) => {
-        alert(`SR Error: ${event.error} | ${event.message ?? 'no message'}`);
-        recognitionErrorRef.current = event.error;
-        const serializedError = serializeSpeechRecognitionError(event);
-        setDebug((current) => ({
-          ...current,
-          lastError: serializedError,
-          lastEvent: "onerror",
-        }));
-      };
-
-      recognition.onend = () => {
-        recognitionEndedRef.current = true;
-        setDebug((current) => ({
-          ...current,
-          lifecycleState: "ended",
-          lastEvent: "onend",
-        }));
-        void maybeSubmitVoice();
-      };
-
-      recognition.start();
+      setupMediaRecorder(stream);
+      setupVAD(stream);
+      beginRecognition();
     } catch {
       setVoiceState("transcript");
       setError(t(locale, "addStickers.voice.permissionError"));
@@ -344,7 +178,188 @@ export function AddStickersVoiceAction({
         lastEvent: "start failed",
       }));
       await finishVoiceSession("start-failed", true);
+      return;
     }
+  };
+
+  const beginRecognition = () => {
+    const Recognition = getSpeechRecognitionConstructor();
+    if (!Recognition) {
+      setError(t(locale, "addStickers.voice.unsupported"));
+      return;
+    }
+
+    setVoiceState("listening");
+
+    const recognition = new Recognition();
+    recognitionRef.current = recognition;
+    recognition.lang = getSpeechRecognitionLanguage(locale);
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 5;
+
+    recognition.onstart = () => {
+      setDebug((current) => ({
+        ...current,
+        lifecycleState: "listening",
+        lastEvent: "onstart",
+      }));
+    };
+
+    recognition.onaudiostart = () => {
+      setDebug((current) => ({
+        ...current,
+        audioStarted: true,
+        audioEnded: false,
+        lastEvent: "onaudiostart",
+      }));
+    };
+
+    recognition.onaudioend = () => {
+      setDebug((current) => ({
+        ...current,
+        audioEnded: true,
+        lastEvent: "onaudioend",
+      }));
+    };
+
+    recognition.onspeechstart = () => {
+      setDebug((current) => ({
+        ...current,
+        speechStarted: true,
+        speechEnded: false,
+        lastEvent: "onspeechstart",
+      }));
+    };
+
+    recognition.onspeechend = () => {
+      setDebug((current) => ({
+        ...current,
+        speechEnded: true,
+        lastEvent: "onspeechend",
+      }));
+    };
+
+    recognition.onresult = (event) => {
+      const alternatives = collectRawSpeechAlternatives(event);
+      const mergedAlternatives = mergeAlternatives(alternativesRef.current, alternatives);
+      alternativesRef.current = mergedAlternatives;
+      const transcriptViews = collectSpeechTranscriptViews(event);
+      finalTranscriptRef.current = transcriptViews.finalTranscript;
+      finalPrimaryConfidenceRef.current = transcriptViews.finalPrimaryConfidence;
+      setTranscript(transcriptViews.liveTranscript);
+      setDebug((current) => ({
+        ...current,
+        rawAlternatives: mergedAlternatives,
+        lastRawTranscript: mergedAlternatives.map((item) => item.transcript).join(" | "),
+        lastEvent: "onresult",
+      }));
+    };
+
+    recognition.onnomatch = (event) => {
+      const alternatives = collectRawSpeechAlternatives(event);
+      setDebug((current) => ({
+        ...current,
+        rawAlternatives: alternatives,
+        lastRawTranscript: alternatives.map((item) => item.transcript).join(" | "),
+        lastEvent: "onnomatch",
+      }));
+    };
+
+    recognition.onerror = (event) => {
+      recognitionErrorRef.current = event.error;
+      const serializedError = serializeSpeechRecognitionError(event);
+      setDebug((current) => ({
+        ...current,
+        lastError: serializedError,
+        lastEvent: "onerror",
+      }));
+    };
+
+    recognition.onend = () => {
+      recognitionEndedRef.current = true;
+      setDebug((current) => ({
+        ...current,
+        lifecycleState: "ended",
+        lastEvent: "onend",
+      }));
+      void maybeSubmitVoice();
+    };
+
+    recognition.start();
+  };
+
+  const setupMediaRecorder = (stream: MediaStream) => {
+    const recorderMimeType = chooseRecorderMimeType();
+    const recorder = recorderMimeType
+      ? new MediaRecorder(stream, { mimeType: recorderMimeType })
+      : new MediaRecorder(stream);
+    recorderRef.current = recorder;
+    recorderEndedRef.current = false;
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) audioChunksRef.current.push(event.data);
+    };
+
+    recorder.onstop = () => {
+      recorderEndedRef.current = true;
+      audioFileRef.current = buildRecordedAudioFile(audioChunksRef.current, recorder.mimeType);
+      setDebug((current) => ({
+        ...current,
+        recording: false,
+        fallbackAudioReady: Boolean(audioFileRef.current),
+        audioMimeType: recorder.mimeType || current.audioMimeType,
+        lastEvent: "mediaRecorder.onstop",
+      }));
+      void maybeSubmitVoice();
+    };
+
+    recorder.start();
+    setDebug((current) => ({
+      ...current,
+      recording: true,
+      audioMimeType: recorder.mimeType || recorderMimeType || "audio/webm",
+      lastEvent: "mediaRecorder.start",
+    }));
+  };
+
+  const setupVAD = (stream: MediaStream) => {
+    const context = new AudioContext();
+    audioContextRef.current = context;
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    analyserRef.current = analyser;
+
+    analysisIntervalRef.current = setInterval(() => {
+      const activeAnalyser = analyserRef.current;
+      if (!activeAnalyser || finalizedRef.current) return;
+      recordingDurationRef.current += sampleEveryMs;
+      const rms = sampleRms(activeAnalyser);
+
+      if (rms < silenceThreshold) {
+        silenceDurationRef.current += sampleEveryMs;
+      } else {
+        silenceDurationRef.current = 0;
+      }
+
+      setDebug((current) => ({
+        ...current,
+        recordingDurationMs: recordingDurationRef.current,
+        silenceDurationMs: silenceDurationRef.current,
+      }));
+
+      if (silenceDurationRef.current >= silenceStopMs && !finalizedRef.current) {
+        void finishVoiceSession("silence-timeout", false);
+      }
+    }, sampleEveryMs);
+
+    maxDurationTimeoutRef.current = setTimeout(() => {
+      if (!finalizedRef.current) {
+        void finishVoiceSession("max-duration", false);
+      }
+}, maxRecordingMs);
   };
 
   const maybeSubmitVoice = async () => {
@@ -507,7 +522,7 @@ export function AddStickersVoiceAction({
               size="pill"
               className="shadow-none"
               disabled={loading || !speechSupported}
-              onClick={() => void startListening()}
+              onClick={() => void prepareCapture()}
             >
               <Mic className="size-4" />
               {t(locale, "addStickers.voice.start")}
