@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AnimatedTabPanel } from "@/components/ui/animated-tab-panel";
+import { TabSlider } from "@/components/ui/tab-slider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { t, type Locale } from "@/lib/i18n";
 import {
@@ -15,7 +16,7 @@ import {
   type StickerGroup,
 } from "@/lib/sticker-data";
 import { StickerSection } from "./sticker-section";
-import type { AlbumTab } from "./sticky-controls";
+import { albumTabs, type AlbumTab } from "./sticky-controls";
 
 type StickerSectionViewModel = {
   group: StickerGroup;
@@ -25,25 +26,63 @@ type StickerSectionViewModel = {
 };
 
 export function AlbumTabPanel({
-  tab,
-  active,
-  direction,
+  activeTabIndex,
+  onTabChange,
   collectionByStickerId,
   locale,
   query,
   sortMode,
   onEditDuplicates,
-  hasChangedTab,
 }: {
-  tab: AlbumTab;
-  active: boolean;
-  direction: "left" | "right";
+  activeTabIndex: number;
+  onTabChange: (index: number) => void;
   collectionByStickerId: Record<string, number>;
   locale: Locale;
   query: string;
   sortMode: "grouped" | "az";
   onEditDuplicates: (sticker: Sticker) => void;
-  hasChangedTab: boolean;
+}) {
+  return (
+    <TabSlider
+      activeIndex={activeTabIndex}
+      tabCount={4}
+      onTabChange={onTabChange}
+    >
+      {albumTabs.map(({ id: tab }, i) => (
+        <AlbumTabContent
+          key={tab}
+          tab={tab}
+          index={i}
+          active={activeTabIndex === i}
+          collectionByStickerId={collectionByStickerId}
+          locale={locale}
+          query={query}
+          sortMode={sortMode}
+          onEditDuplicates={onEditDuplicates}
+        />
+      ))}
+    </TabSlider>
+  );
+}
+
+function AlbumTabContent({
+  tab,
+  index,
+  active,
+  collectionByStickerId,
+  locale,
+  query,
+  sortMode,
+  onEditDuplicates,
+}: {
+  tab: AlbumTab;
+  index: number;
+  active: boolean;
+  collectionByStickerId: Record<string, number>;
+  locale: Locale;
+  query: string;
+  sortMode: "grouped" | "az";
+  onEditDuplicates: (sticker: Sticker) => void;
 }) {
   const sections = useMemo(
     () =>
@@ -59,9 +98,9 @@ export function AlbumTabPanel({
 
   return (
     <AnimatedTabPanel
+      index={index}
+      tabCount={4}
       active={active}
-      direction={direction}
-      hasChangedTab={hasChangedTab}
       className="space-y-4 bg-background"
     >
       {sections.map(

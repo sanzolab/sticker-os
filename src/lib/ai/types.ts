@@ -29,6 +29,7 @@ export type ParseStickersInput =
         name?: string;
       };
       provider?: AiProviderName;
+      reason?: string;
     };
 
 export type ModelStickerSuggestion = {

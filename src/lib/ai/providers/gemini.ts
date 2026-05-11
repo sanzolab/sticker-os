@@ -80,6 +80,7 @@ function buildPrompt(input: ParseStickersInput) {
   const type = input.type;
   const isVoiceContext =
     type === "audio" || (type === "text" && input.source === "voice-transcript");
+  const isBackendOnlyFallback = type === "audio" && input.reason === "local-engine-fail";
 
   return [
     "Identify Panini World Cup 2026 stickers from this input.",
@@ -100,6 +101,9 @@ function buildPrompt(input: ParseStickersInput) {
       : "",
     type === "audio"
       ? "Analyze the spoken request in the audio."
+      : "",
+    isBackendOnlyFallback
+      ? "The local speech recognition engine failed to produce a transcript. Perform a full transcription of the audio first, then extract sticker codes from the transcribed text. Prioritize accuracy over speed."
       : "",
   ]
     .filter(Boolean)

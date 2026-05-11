@@ -26,6 +26,7 @@ export type AddStickersVoiceSubmission = {
   };
   audioFile: File | null;
   stopReason: string;
+  reason?: string;
 };
 
 export type AddStickerUnresolved = {

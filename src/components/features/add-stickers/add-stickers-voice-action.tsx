@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { Mic, RotateCcw, Square, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { useStickerStore } from "@/lib/store";
 import {
-  collectRawSpeechAlternatives,
-  collectSpeechTranscriptViews,
   getSpeechRecognitionLanguage,
-  serializeSpeechRecognitionError,
   type RawSpeechAlternative,
   type SerializedSpeechRecognitionError,
 } from "./add-stickers-speech";
 import type { AddStickersVoiceSubmission } from "./add-stickers-types";
+import { useVoiceSession } from "./voice/use-voice-session";
+import type { VoiceState } from "./voice/voice-types";
 
-type VoiceState = "idle" | "listening" | "processing" | "transcript";
 type MicrophonePermissionStatus =
   | PermissionState
   | "unsupported"
@@ -49,11 +48,6 @@ type SpeechDebugState = {
   lastEvent: string;
 };
 
-const silenceThreshold = 0.015;
-const silenceStopMs = 2500;
-const maxRecordingMs = 15000;
-const sampleEveryMs = 100;
-
 export function AddStickersVoiceAction({
   loading,
   onSubmitAudio,
@@ -74,37 +68,143 @@ export function AddStickersVoiceAction({
   const [speechSupported] = useState(() => Boolean(getSpeechRecognitionConstructor()));
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isBackendOnlyMode, setIsBackendOnlyMode] = useState(false);
   const [debug, setDebug] = useState<SpeechDebugState>(() => getInitialDebugState());
-
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const recognitionEndedRef = useRef(true);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const recorderEndedRef = useRef(true);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const analysisIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const maxDurationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animFrameRef = useRef<number>(0);
   const finalTranscriptRef = useRef("");
   const finalPrimaryConfidenceRef = useRef({ minimum: 0, segmentCount: 0 });
-  const alternativesRef = useRef<RawSpeechAlternative[]>([]);
-  const audioChunksRef = useRef<Blob[]>([]);
   const audioFileRef = useRef<File | null>(null);
-  const shouldProcessRef = useRef(false);
-  const cancelledRef = useRef(false);
   const stopReasonRef = useRef("");
-  const recordingDurationRef = useRef(0);
-  const silenceDurationRef = useRef(0);
-  const finalizedRef = useRef(false);
-  const recognitionErrorRef = useRef<SpeechRecognitionErrorCode | null>(null);
+  const isBackendOnlyModeRef = useRef(false);
+
+  const session = useVoiceSession();
+
+  const handleSubmit = useCallback(
+    async (submission: AddStickersVoiceSubmission) => {
+      audioFileRef.current = submission.audioFile;
+      finalTranscriptRef.current = submission.transcript;
+      finalPrimaryConfidenceRef.current = submission.finalPrimaryConfidence;
+      stopReasonRef.current = submission.stopReason;
+
+      const result = await onSubmitTranscript(submission);
+      if (result.ok) {
+        setIsBackendOnlyMode(false);
+        isBackendOnlyModeRef.current = false;
+        setVoiceState("idle");
+        setError(null);
+      }
+      return result;
+    },
+    [onSubmitTranscript],
+  );
+
+  const startVisualizer = useCallback(() => {
+    const canvas = canvasRef.current;
+    const analyser = session.getAnalyser();
+    if (!canvas || !analyser) return;
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: false });
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const bufferLength = analyser.fftSize;
+    const dataArray = new Uint8Array(bufferLength);
+    const gradient = ctx.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, "#94a3b8");
+    gradient.addColorStop(1, "#0070f3");
+
+    const SKIP_THRESHOLD_MS = 20;
+    const SLOW_FRAMES_TO_DOWNGRADE = 3;
+    const RECOVERY_FRAMES = 10;
+
+    let frameCount = 0;
+    let lastFrameTime = performance.now();
+    let consecutiveSlowFrames = 0;
+    let consecutiveFastFrames = 0;
+    let is30fps = typeof navigator !== "undefined"
+      && navigator.hardwareConcurrency !== undefined
+      && navigator.hardwareConcurrency <= 4;
+
+    const draw = () => {
+      if (!canvasRef.current) {
+        animFrameRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
+      const now = performance.now();
+      const delta = now - lastFrameTime;
+      lastFrameTime = now;
+
+      if (delta > SKIP_THRESHOLD_MS) {
+        consecutiveSlowFrames++;
+        consecutiveFastFrames = 0;
+      } else {
+        consecutiveFastFrames++;
+        consecutiveSlowFrames = 0;
+      }
+
+      if (consecutiveSlowFrames >= SLOW_FRAMES_TO_DOWNGRADE) {
+        is30fps = true;
+      } else if (consecutiveFastFrames >= RECOVERY_FRAMES) {
+        is30fps = false;
+      }
+
+      frameCount++;
+      if (is30fps && frameCount % 2 !== 0) {
+        animFrameRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
+      analyser.getByteTimeDomainData(dataArray);
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = gradient;
+      ctx.beginPath();
+
+      const sliceWidth = width / bufferLength;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * height) / 2;
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+
+        x += sliceWidth;
+      }
+
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+
+      animFrameRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+  }, [session]);
+
+  const stopVisualizer = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+    }
+  }, []);
 
   async function refreshMicrophonePermission() {
     const microphonePermission = await queryMicrophonePermission();
     setDebug((current) => ({ ...current, microphonePermission }));
   }
 
-const prepareCapture = async () => {
+  const prepareCapture = useCallback(async () => {
     if (onBeforeStartCapture) {
       const shouldStart = await onBeforeStartCapture();
       if (!shouldStart) return;
@@ -116,25 +216,16 @@ const prepareCapture = async () => {
       return;
     }
 
-    await finishVoiceSession("reset-before-start", true);
+    await session.cleanup();
     await refreshMicrophonePermission();
 
-    setVoiceState("listening");
-    setError(null);
     setTranscript("");
     finalTranscriptRef.current = "";
     finalPrimaryConfidenceRef.current = { minimum: 0, segmentCount: 0 };
-    alternativesRef.current = [];
-    audioChunksRef.current = [];
     audioFileRef.current = null;
-    cancelledRef.current = false;
-    shouldProcessRef.current = false;
-    finalizedRef.current = false;
-    recognitionEndedRef.current = false;
-    recorderEndedRef.current = true;
-    recognitionErrorRef.current = null;
-    recordingDurationRef.current = 0;
-    silenceDurationRef.current = 0;
+    stopReasonRef.current = "";
+    setIsBackendOnlyMode(false);
+    isBackendOnlyModeRef.current = false;
 
     setDebug((current) => ({
       ...current,
@@ -146,7 +237,7 @@ const prepareCapture = async () => {
       secureContext: getSecureContext(),
       protocol: getLocationProtocol(),
       host: getLocationHost(),
-      recording: false,
+      recording: true,
       recordingDurationMs: 0,
       silenceDurationMs: 0,
       stopReason: "",
@@ -162,13 +253,29 @@ const prepareCapture = async () => {
       lastEvent: "start requested",
     }));
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      setupMediaRecorder(stream);
-      setupVAD(stream);
-      beginRecognition();
-    } catch {
+    startVisualizer();
+
+    const started = await session.start(locale, {
+      onVoiceStateChange: (state) => {
+        setVoiceState(state);
+      },
+      onTranscriptUpdate: (text) => {
+        setTranscript(text);
+        finalTranscriptRef.current = text;
+      },
+      onLiveTranscriptUpdate: (text) => {
+        setTranscript(text);
+      },
+      onBackendOnlyModeChange: (value) => {
+        setIsBackendOnlyMode(value);
+        isBackendOnlyModeRef.current = value;
+      },
+      onError: setError,
+      onSubmit: handleSubmit,
+    });
+
+    if (!started) {
+      stopVisualizer();
       setVoiceState("transcript");
       setError(t(locale, "addStickers.voice.permissionError"));
       setDebug((current) => ({
@@ -177,309 +284,43 @@ const prepareCapture = async () => {
         stopReason: "microphone error",
         lastEvent: "start failed",
       }));
-      await finishVoiceSession("start-failed", true);
-      return;
     }
-  };
+  }, [locale, session, onBeforeStartCapture, startVisualizer, stopVisualizer, handleSubmit]);
 
-  const beginRecognition = () => {
-    const Recognition = getSpeechRecognitionConstructor();
-    if (!Recognition) {
-      setError(t(locale, "addStickers.voice.unsupported"));
-      return;
-    }
+  const stopListening = useCallback(() => {
+    void session.stop({
+      onVoiceStateChange: setVoiceState,
+      onTranscriptUpdate: (text) => { setTranscript(text); finalTranscriptRef.current = text; },
+      onLiveTranscriptUpdate: setTranscript,
+      onBackendOnlyModeChange: (value) => { setIsBackendOnlyMode(value); isBackendOnlyModeRef.current = value; },
+      onError: setError,
+      onSubmit: handleSubmit,
+    });
+    stopVisualizer();
+  }, [session, stopVisualizer, handleSubmit]);
 
-    setVoiceState("listening");
+  const cancelListening = useCallback(() => {
+    void session.cancel({
+      onVoiceStateChange: setVoiceState,
+      onTranscriptUpdate: (text) => { setTranscript(text); finalTranscriptRef.current = text; },
+      onLiveTranscriptUpdate: setTranscript,
+      onBackendOnlyModeChange: (value) => { setIsBackendOnlyMode(value); isBackendOnlyModeRef.current = value; },
+      onError: setError,
+      onSubmit: handleSubmit,
+    });
+    stopVisualizer();
+  }, [session, stopVisualizer, handleSubmit]);
 
-    const recognition = new Recognition();
-    recognitionRef.current = recognition;
-    recognition.lang = getSpeechRecognitionLanguage(locale);
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 5;
-
-    recognition.onstart = () => {
-      setDebug((current) => ({
-        ...current,
-        lifecycleState: "listening",
-        lastEvent: "onstart",
-      }));
-    };
-
-    recognition.onaudiostart = () => {
-      setDebug((current) => ({
-        ...current,
-        audioStarted: true,
-        audioEnded: false,
-        lastEvent: "onaudiostart",
-      }));
-    };
-
-    recognition.onaudioend = () => {
-      setDebug((current) => ({
-        ...current,
-        audioEnded: true,
-        lastEvent: "onaudioend",
-      }));
-    };
-
-    recognition.onspeechstart = () => {
-      setDebug((current) => ({
-        ...current,
-        speechStarted: true,
-        speechEnded: false,
-        lastEvent: "onspeechstart",
-      }));
-    };
-
-    recognition.onspeechend = () => {
-      setDebug((current) => ({
-        ...current,
-        speechEnded: true,
-        lastEvent: "onspeechend",
-      }));
-    };
-
-    recognition.onresult = (event) => {
-      const alternatives = collectRawSpeechAlternatives(event);
-      const mergedAlternatives = mergeAlternatives(alternativesRef.current, alternatives);
-      alternativesRef.current = mergedAlternatives;
-      const transcriptViews = collectSpeechTranscriptViews(event);
-      finalTranscriptRef.current = transcriptViews.finalTranscript;
-      finalPrimaryConfidenceRef.current = transcriptViews.finalPrimaryConfidence;
-      setTranscript(transcriptViews.liveTranscript);
-      setDebug((current) => ({
-        ...current,
-        rawAlternatives: mergedAlternatives,
-        lastRawTranscript: mergedAlternatives.map((item) => item.transcript).join(" | "),
-        lastEvent: "onresult",
-      }));
-    };
-
-    recognition.onnomatch = (event) => {
-      const alternatives = collectRawSpeechAlternatives(event);
-      setDebug((current) => ({
-        ...current,
-        rawAlternatives: alternatives,
-        lastRawTranscript: alternatives.map((item) => item.transcript).join(" | "),
-        lastEvent: "onnomatch",
-      }));
-    };
-
-    recognition.onerror = (event) => {
-      recognitionErrorRef.current = event.error;
-      const serializedError = serializeSpeechRecognitionError(event);
-      setDebug((current) => ({
-        ...current,
-        lastError: serializedError,
-        lastEvent: "onerror",
-      }));
-    };
-
-    recognition.onend = () => {
-      recognitionEndedRef.current = true;
-      setDebug((current) => ({
-        ...current,
-        lifecycleState: "ended",
-        lastEvent: "onend",
-      }));
-      void maybeSubmitVoice();
-    };
-
-    recognition.start();
-  };
-
-  const setupMediaRecorder = (stream: MediaStream) => {
-    const recorderMimeType = chooseRecorderMimeType();
-    const recorder = recorderMimeType
-      ? new MediaRecorder(stream, { mimeType: recorderMimeType })
-      : new MediaRecorder(stream);
-    recorderRef.current = recorder;
-    recorderEndedRef.current = false;
-
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) audioChunksRef.current.push(event.data);
-    };
-
-    recorder.onstop = () => {
-      recorderEndedRef.current = true;
-      audioFileRef.current = buildRecordedAudioFile(audioChunksRef.current, recorder.mimeType);
-      setDebug((current) => ({
-        ...current,
-        recording: false,
-        fallbackAudioReady: Boolean(audioFileRef.current),
-        audioMimeType: recorder.mimeType || current.audioMimeType,
-        lastEvent: "mediaRecorder.onstop",
-      }));
-      void maybeSubmitVoice();
-    };
-
-    recorder.start();
-    setDebug((current) => ({
-      ...current,
-      recording: true,
-      audioMimeType: recorder.mimeType || recorderMimeType || "audio/webm",
-      lastEvent: "mediaRecorder.start",
-    }));
-  };
-
-  const setupVAD = (stream: MediaStream) => {
-    const context = new AudioContext();
-    audioContextRef.current = context;
-    const source = context.createMediaStreamSource(stream);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 2048;
-    source.connect(analyser);
-    analyserRef.current = analyser;
-
-    analysisIntervalRef.current = setInterval(() => {
-      const activeAnalyser = analyserRef.current;
-      if (!activeAnalyser || finalizedRef.current) return;
-      recordingDurationRef.current += sampleEveryMs;
-      const rms = sampleRms(activeAnalyser);
-
-      if (rms < silenceThreshold) {
-        silenceDurationRef.current += sampleEveryMs;
-      } else {
-        silenceDurationRef.current = 0;
-      }
-
-      setDebug((current) => ({
-        ...current,
-        recordingDurationMs: recordingDurationRef.current,
-        silenceDurationMs: silenceDurationRef.current,
-      }));
-
-      if (silenceDurationRef.current >= silenceStopMs && !finalizedRef.current) {
-        void finishVoiceSession("silence-timeout", false);
-      }
-    }, sampleEveryMs);
-
-    maxDurationTimeoutRef.current = setTimeout(() => {
-      if (!finalizedRef.current) {
-        void finishVoiceSession("max-duration", false);
-      }
-}, maxRecordingMs);
-  };
-
-  const maybeSubmitVoice = async () => {
-    if (!shouldProcessRef.current) return;
-    if (!recognitionEndedRef.current || !recorderEndedRef.current) return;
-
-    shouldProcessRef.current = false;
-    setVoiceState("processing");
-    setDebug((current) => ({
-      ...current,
-      lifecycleState: "processing",
-      lastEvent: "submit voice payload",
-    }));
-
-    const result = await onSubmitTranscript({
-      transcript: finalTranscriptRef.current.trim(),
-      finalPrimaryConfidence: finalPrimaryConfidenceRef.current,
-      audioFile: audioFileRef.current,
-      stopReason: stopReasonRef.current,
-    }).catch(() => ({
-      ok: false,
-      message: t(locale, "addStickers.voice.connectionError"),
-    }));
-
-    if (!result.ok) {
-      setVoiceState("transcript");
-      setError(result.message ?? t(locale, "addStickers.voice.recognitionError"));
-      return;
-    }
-
-    setVoiceState("idle");
-    setError(null);
-  };
-
-  async function finishVoiceSession(reason: string, cancel: boolean) {
-    stopReasonRef.current = reason;
-    if (finalizedRef.current) return;
-    finalizedRef.current = true;
-    cancelledRef.current = cancel;
-    shouldProcessRef.current = !cancel;
-
-    setDebug((current) => ({
-      ...current,
-      lifecycleState: "stopping",
-      stopReason: reason,
-      lastEvent: cancel ? "cancel requested" : "stop requested",
-    }));
-
-    if (analysisIntervalRef.current) {
-      clearInterval(analysisIntervalRef.current);
-      analysisIntervalRef.current = null;
-    }
-    if (maxDurationTimeoutRef.current) {
-      clearTimeout(maxDurationTimeoutRef.current);
-      maxDurationTimeoutRef.current = null;
-    }
-
-    const recognition = recognitionRef.current;
-    recognitionRef.current = null;
-    if (recognition) {
-      try {
-        if (cancel) recognition.abort();
-        else recognition.stop();
-      } catch {}
-    } else {
-      recognitionEndedRef.current = true;
-    }
-
-    const recorder = recorderRef.current;
-    recorderRef.current = null;
-    if (recorder && recorder.state !== "inactive") {
-      try {
-        recorder.stop();
-      } catch {
-        recorderEndedRef.current = true;
-      }
-    } else {
-      recorderEndedRef.current = true;
-    }
-
-    const stream = streamRef.current;
-    streamRef.current = null;
-    stream?.getTracks().forEach((track) => track.stop());
-
-    const context = audioContextRef.current;
-    audioContextRef.current = null;
-    if (context && context.state !== "closed") {
-      await context.close().catch(() => undefined);
-    }
-    analyserRef.current = null;
-
-    if (cancel) {
-      setVoiceState("idle");
-      setError(null);
-      shouldProcessRef.current = false;
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      void finishVoiceSession("component-unmount", true);
-    };
-  }, []);
-
-  const stopListening = () => {
-    void finishVoiceSession("manual-stop", false);
-  };
-
-  const cancelListening = () => {
-    void finishVoiceSession("manual-cancel", true);
-  };
-
-  const retryTranscript = () => {
+  const retryTranscript = useCallback(() => {
     setError(null);
     setVoiceState("idle");
     setTranscript("");
     finalTranscriptRef.current = "";
     finalPrimaryConfidenceRef.current = { minimum: 0, segmentCount: 0 };
-    alternativesRef.current = [];
     audioFileRef.current = null;
+    stopReasonRef.current = "";
+    setIsBackendOnlyMode(false);
+    isBackendOnlyModeRef.current = false;
     setDebug((current) => ({
       ...current,
       lifecycleState: "idle",
@@ -493,7 +334,14 @@ const prepareCapture = async () => {
       lastError: null,
       lastEvent: "retry reset",
     }));
-  };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopVisualizer();
+      void session.teardown();
+    };
+  }, [session, stopVisualizer]);
 
   return (
     <Card className="border-accent bg-accent/40 p-4">
@@ -512,6 +360,20 @@ const prepareCapture = async () => {
             <p className="text-xs text-muted-foreground">
               {t(locale, "addStickers.voice.example")}
             </p>
+          </div>
+        </div>
+
+        <div className={cn(
+          "transition-[opacity,max-height] duration-500 ease-in-out overflow-hidden",
+          (voiceState === "listening" || voiceState === "processing")
+            ? "opacity-100 max-h-64"
+            : "opacity-0 max-h-0",
+        )}>
+          <div className={cn(
+            "transition-transform duration-700 ease-in-out",
+            isBackendOnlyMode ? "scale-125 visualizer-pulse" : "scale-100",
+          )}>
+            <canvas ref={canvasRef} className="w-full h-48 rounded-md" />
           </div>
         </div>
 
@@ -565,24 +427,28 @@ const prepareCapture = async () => {
                 {t(locale, "common.cancel")}
               </Button>
               <p className="basis-full text-xs text-muted-foreground">
-                {t(locale, "addStickers.voice.listening")}
+                {isBackendOnlyMode
+                  ? t(locale, "addStickers.voice.listening")
+                  : t(locale, "addStickers.voice.listening")}
               </p>
             </div>
-            <div className="min-h-16 rounded-md border border-border bg-background/70 px-3 py-2 text-sm">
-              {transcript ? (
-                transcript
-              ) : (
-                <span className="text-muted-foreground">
-                  {t(locale, "addStickers.voice.transcriptPlaceholder")}
-                </span>
-              )}
-            </div>
+            {!isBackendOnlyMode && (
+              <div className="min-h-16 rounded-md border border-border bg-background/70 px-3 py-2 text-sm">
+                {transcript ? (
+                  transcript
+                ) : (
+                  <span className="text-muted-foreground">
+                    {t(locale, "addStickers.voice.transcriptPlaceholder")}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {voiceState === "processing" && (
           <p className="text-xs text-muted-foreground">
-            {t(locale, "addStickers.voice.processing")}
+            {isBackendOnlyMode ? t(locale, "addStickers.voice.deepProcessing") : t(locale, "addStickers.voice.processing")}
           </p>
         )}
 
@@ -616,9 +482,9 @@ const prepareCapture = async () => {
                   setError(null);
                   void onSubmitTranscript({
                     transcript: transcript.trim(),
-                    finalPrimaryConfidence: { minimum: 1, segmentCount: 1 },
+                    finalPrimaryConfidence: finalPrimaryConfidenceRef.current,
                     audioFile: audioFileRef.current,
-                    stopReason: "manual-analyze",
+                    stopReason: stopReasonRef.current || "manual-analyze",
                   }).then((result) => {
                     if (!result.ok) {
                       setVoiceState("transcript");
@@ -820,29 +686,6 @@ function getInitialDebugState(): SpeechDebugState {
   };
 }
 
-function chooseRecorderMimeType() {
-  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
-  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
-  return candidates.find((item) => MediaRecorder.isTypeSupported(item)) ?? "";
-}
-
-function buildRecordedAudioFile(chunks: Blob[], mimeType: string) {
-  if (chunks.length === 0) return null;
-  const outputMimeType = normalizeRecordedAudioMimeType(mimeType || "audio/webm");
-  const blob = new Blob(chunks, { type: outputMimeType });
-  if (blob.size === 0) return null;
-
-  const extension = outputMimeType.includes("ogg")
-    ? "ogg"
-    : outputMimeType.includes("mp4")
-      ? "m4a"
-      : outputMimeType.includes("mpeg")
-        ? "mp3"
-        : "webm";
-
-  return new File([blob], `voice-${Date.now()}.${extension}`, { type: outputMimeType });
-}
-
 export function normalizeRecordedAudioMimeType(value: string) {
   const normalized = value.toLowerCase();
   const container = normalized.split(";")[0]?.trim() ?? normalized;
@@ -854,37 +697,6 @@ export function normalizeRecordedAudioMimeType(value: string) {
   if (container.includes("wav")) return "audio/wav";
 
   return "audio/webm";
-}
-
-function sampleRms(analyser: AnalyserNode) {
-  const buffer = new Uint8Array(analyser.fftSize);
-  analyser.getByteTimeDomainData(buffer);
-
-  let squareTotal = 0;
-  for (const value of buffer) {
-    const centered = (value - 128) / 128;
-    squareTotal += centered * centered;
-  }
-  return Math.sqrt(squareTotal / buffer.length);
-}
-
-function mergeAlternatives(
-  existing: RawSpeechAlternative[],
-  incoming: RawSpeechAlternative[],
-) {
-  const merged = [...existing];
-  const seen = new Set(
-    merged.map((item) => `${item.resultIndex}-${item.alternativeIndex}-${item.transcript}`),
-  );
-
-  for (const item of incoming) {
-    const key = `${item.resultIndex}-${item.alternativeIndex}-${item.transcript}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(item);
-  }
-
-  return merged;
 }
 
 function getSecureContext() {

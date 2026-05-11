@@ -5,28 +5,29 @@ import { cn } from "@/lib/utils";
 
 export type AnimatedTabPanelProps = {
   active: boolean;
-  direction?: "left" | "right";
-  hasChangedTab?: boolean;
+  index: number;
+  tabCount: number;
   className?: string;
   children: ReactNode;
 };
 
 export function AnimatedTabPanel({
   active,
-  direction = "right",
-  hasChangedTab = true,
+  tabCount,
   className,
   children,
 }: AnimatedTabPanelProps) {
   return (
     <section
-      hidden={!active}
-      data-direction={direction}
-      className={cn(
-        "tabs-content bg-background",
-        active && hasChangedTab ? "tabs-content-active" : "",
-        className,
-      )}
+      aria-hidden={!active || undefined}
+      // @ts-expect-error inert is a new HTML attribute
+      inert={!active ? "" : undefined}
+      className={cn("tab-slider-panel", className)}
+      style={{
+        flex: `0 0 calc(100% / ${tabCount})`,
+        minWidth: 0,
+        overflowX: "hidden",
+      }}
     >
       {children}
     </section>

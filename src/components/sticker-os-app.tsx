@@ -11,25 +11,20 @@ import { StatsDrawer } from "@/components/stats-drawer";
 import { StickyControls, albumTabs, type AlbumTab } from "@/components/sticky-controls";
 import { TopBar, type ShareState } from "@/components/top-bar";
 import { TradeDrawer } from "@/components/trade-drawer";
+import { useAssistantStore } from "@/lib/assistant-store";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
 import { useAddStickersPendingStore } from "@/components/features/add-stickers/add-stickers-session";
 import type { Sticker } from "@/lib/sticker-data";
 
 type SortMode = "grouped" | "az";
-type TabTransitionDirection = "left" | "right";
 
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [addStickersOpen, setAddStickersOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
-  const [visitedTabs, setVisitedTabs] = useState<AlbumTab[]>(["all"]);
   const [sortMode, setSortMode] = useState<SortMode>("grouped");
   const [activeTab, setActiveTab] = useState<AlbumTab>("all");
-  const [tabTransitionDirection, setTabTransitionDirection] =
-    useState<TabTransitionDirection>("right");
-  const [hasChangedTab, setHasChangedTab] = useState(false);
   const [duplicateEditorSticker, setDuplicateEditorSticker] =
     useState<Sticker | null>(null);
   const [shareState, setShareState] = useState<ShareState>("idle");
@@ -45,6 +40,8 @@ export function StickerOSApp() {
   const pendingAddStickersCount = useAddStickersPendingStore(
     (state) => state.candidates.length,
   );
+  const addStickersOpen = useAssistantStore((s) => s.addStickersOpen);
+  const setAddStickersOpen = useAssistantStore((s) => s.setAddStickersOpen);
 
   const handleEditDuplicates = useCallback((sticker: Sticker) => {
     setDuplicateEditorSticker(sticker);
@@ -60,7 +57,7 @@ export function StickerOSApp() {
 
   const handleAddStickersOpen = useCallback(() => {
     setAddStickersOpen(true);
-  }, []);
+  }, [setAddStickersOpen]);
 
   const handleTradeOpen = useCallback(() => {
     setTradeOpen(true);
@@ -78,22 +75,17 @@ export function StickerOSApp() {
     setSortMode((mode) => (mode === "grouped" ? "az" : "grouped"));
   }, []);
 
-  const handleTabChange = useCallback(
-    (tab: AlbumTab) => {
-      if (tab === activeTab) return;
+  const handleTabChange = useCallback((tab: AlbumTab) => {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+  }, [activeTab]);
 
-      const currentIndex = albumTabs.findIndex((item) => item.id === activeTab);
-      const nextIndex = albumTabs.findIndex((item) => item.id === tab);
+  const activeTabIndex = albumTabs.findIndex((item) => item.id === activeTab);
 
-      setTabTransitionDirection(
-        nextIndex > currentIndex ? "right" : "left",
-      );
-      setVisitedTabs((tabs) => (tabs.includes(tab) ? tabs : [...tabs, tab]));
-      setActiveTab(tab);
-      setHasChangedTab(true);
-    },
-    [activeTab],
-  );
+  const handleTabChangeByIndex = useCallback((index: number) => {
+    const tab = albumTabs[index]?.id;
+    if (tab && tab !== activeTab) setActiveTab(tab);
+  }, [activeTab]);
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -120,21 +112,16 @@ export function StickerOSApp() {
           onTabChange={handleTabChange}
         />
 
-        <section className="tabs-content-wrapper min-h-[calc(100dvh-8rem)] bg-background pt-4">
-          {visitedTabs.map((tab) => (
-            <AlbumTabPanel
-              key={tab}
-              tab={tab}
-              active={tab === activeTab}
-              direction={tabTransitionDirection}
-              collectionByStickerId={collectionByStickerId}
-              locale={locale}
-              query={query}
-              sortMode={sortMode}
-              onEditDuplicates={handleEditDuplicates}
-              hasChangedTab={hasChangedTab}
-            />
-          ))}
+        <section className="min-h-[calc(100dvh-8rem)] bg-background pt-4">
+          <AlbumTabPanel
+            activeTabIndex={activeTabIndex}
+            onTabChange={handleTabChangeByIndex}
+            collectionByStickerId={collectionByStickerId}
+            locale={locale}
+            query={query}
+            sortMode={sortMode}
+            onEditDuplicates={handleEditDuplicates}
+          />
         </section>
       </div>
 

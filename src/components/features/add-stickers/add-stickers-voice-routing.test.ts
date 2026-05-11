@@ -11,33 +11,27 @@ describe("voice routing helpers", () => {
     expect(getFinalPrimaryConfidenceMinimum({ minimum: Number.NaN, segmentCount: 1 })).toBe(0);
   });
 
-  it("routes to deterministic when at least one candidate exists and confidence is high enough", () => {
+  it("routes to deterministic when candidates exist and parser finds no unresolved tokens", () => {
     expect(shouldUseDeterministicVoiceResult({
       candidatesCount: 1,
       needsFallback: false,
-      minimumFinalPrimaryConfidence: 0.7,
     })).toBe(true);
 
     expect(shouldUseDeterministicVoiceResult({
-      candidatesCount: 2,
+      candidatesCount: 3,
       needsFallback: false,
-      minimumFinalPrimaryConfidence: 0.69,
-    })).toBe(false);
+    })).toBe(true);
   });
 
   it("routes to fallback when there are zero valid candidates", () => {
     expect(shouldUseDeterministicVoiceResult({
       candidatesCount: 0,
       needsFallback: false,
-      minimumFinalPrimaryConfidence: 0.95,
     })).toBe(false);
-  });
 
-  it("routes to fallback when final primary confidence is below threshold", () => {
     expect(shouldUseDeterministicVoiceResult({
-      candidatesCount: 2,
-      needsFallback: false,
-      minimumFinalPrimaryConfidence: 0.699,
+      candidatesCount: 0,
+      needsFallback: true,
     })).toBe(false);
   });
 
@@ -45,7 +39,11 @@ describe("voice routing helpers", () => {
     expect(shouldUseDeterministicVoiceResult({
       candidatesCount: 2,
       needsFallback: true,
-      minimumFinalPrimaryConfidence: 0.95,
+    })).toBe(false);
+
+    expect(shouldUseDeterministicVoiceResult({
+      candidatesCount: 1,
+      needsFallback: true,
     })).toBe(false);
   });
 });

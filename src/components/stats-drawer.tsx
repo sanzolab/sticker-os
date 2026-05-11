@@ -7,6 +7,7 @@ import { AppDrawer } from "@/components/ui/app-drawer";
 import { Button } from "@/components/ui/button";
 import { DataGrid } from "@/components/data-grid";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
+import { TabSlider } from "@/components/ui/tab-slider";
 import { t, type Locale } from "@/lib/i18n";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
 import { getStickerCopies, stickerGroups, stickers } from "@/lib/sticker-data";
@@ -30,7 +31,6 @@ export function StatsDrawer({
   stats: ReturnType<typeof useCollectionStats>;
 }) {
   const [activeTab, setActiveTab] = useState<StatsTab>("summary");
-  const [tabDirection, setTabDirection] = useState<"left" | "right">("right");
   const [teamSort, setTeamSort] = useState<TeamSortMode>("most");
   const locale = useStickerStore((state) => state.settings.locale);
   const items = useMemo(
@@ -45,17 +45,23 @@ export function StatsDrawer({
     [locale],
   );
 
-  const handleTabChange = useCallback((nextTab: StatsTab) => {
-    setActiveTab((currentTab) => {
-      if (currentTab === nextTab) return currentTab;
+  const handleTabChange = useCallback(
+    (nextTab: StatsTab) => {
+      if (nextTab === activeTab) return;
+      setActiveTab(nextTab);
+    },
+    [activeTab],
+  );
 
-      const currentIndex = statsTabs.indexOf(currentTab);
-      const nextIndex = statsTabs.indexOf(nextTab);
+  const activeTabIndex = statsTabs.indexOf(activeTab);
 
-      setTabDirection(nextIndex > currentIndex ? "right" : "left");
-      return nextTab;
-    });
-  }, []);
+  const handleSwipeChange = useCallback(
+    (index: number) => {
+      const nextTab = statsTabs[index];
+      if (nextTab !== activeTab) setActiveTab(nextTab);
+    },
+    [activeTab],
+  );
 
   const teamProgress = useMemo(
     () =>
@@ -98,54 +104,62 @@ export function StatsDrawer({
         activeTabClassName="text-primary"
       />
 
-      <AnimatedTabPanel
-        active={activeTab === "summary"}
-        direction={tabDirection}
-        className="space-y-3"
+      <TabSlider
+        activeIndex={activeTabIndex}
+        tabCount={2}
+        onTabChange={handleSwipeChange}
       >
-        <ProgressRow
-          label={t(locale, "stats.summary.albumCompletion")}
-          value={stats.completion}
-          detail={`${stats.collected}/${stats.total}`}
-        />
-        <ProgressRow
-          label={t(locale, "stats.summary.specialCompletion")}
-          value={percentage(stats.specialCollected, stats.specialTotal)}
-          detail={`${stats.specialCollected}/${stats.specialTotal}`}
-        />
-        <ProgressRow
-          label={t(locale, "stats.summary.teams")}
-          value={percentage(stats.teamCollected, stats.teamTotal)}
-          detail={`${stats.teamCollected}/${stats.teamTotal}`}
-        />
-        <ProgressRow
-          label={t(locale, "stats.summary.shields")}
-          value={percentage(stats.shieldCollected, stats.shieldTotal)}
-          detail={`${stats.shieldCollected}/${stats.shieldTotal}`}
-        />
-      </AnimatedTabPanel>
-
-      <AnimatedTabPanel
-        active={activeTab === "teams"}
-        direction={tabDirection}
-        className="space-y-3"
-      >
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-center rounded-sm shadow-none"
-          onClick={() =>
-            setTeamSort((mode) => (mode === "most" ? "least" : "most"))
-          }
+        <AnimatedTabPanel
+          index={0}
+          tabCount={2}
+          active={activeTab === "summary"}
+          className="space-y-3"
         >
-          {teamSort === "most"
-            ? t(locale, "stats.sort.most")
-            : t(locale, "stats.sort.least")}
-        </Button>
-        {teamProgress.map((item) => (
-          <TeamProgressRow key={item.code} item={item} />
-        ))}
-      </AnimatedTabPanel>
+          <ProgressRow
+            label={t(locale, "stats.summary.albumCompletion")}
+            value={stats.completion}
+            detail={`${stats.collected}/${stats.total}`}
+          />
+          <ProgressRow
+            label={t(locale, "stats.summary.specialCompletion")}
+            value={percentage(stats.specialCollected, stats.specialTotal)}
+            detail={`${stats.specialCollected}/${stats.specialTotal}`}
+          />
+          <ProgressRow
+            label={t(locale, "stats.summary.teams")}
+            value={percentage(stats.teamCollected, stats.teamTotal)}
+            detail={`${stats.teamCollected}/${stats.teamTotal}`}
+          />
+          <ProgressRow
+            label={t(locale, "stats.summary.shields")}
+            value={percentage(stats.shieldCollected, stats.shieldTotal)}
+            detail={`${stats.shieldCollected}/${stats.shieldTotal}`}
+          />
+        </AnimatedTabPanel>
+
+        <AnimatedTabPanel
+          index={1}
+          tabCount={2}
+          active={activeTab === "teams"}
+          className="space-y-3"
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-center rounded-sm shadow-none"
+            onClick={() =>
+              setTeamSort((mode) => (mode === "most" ? "least" : "most"))
+            }
+          >
+            {teamSort === "most"
+              ? t(locale, "stats.sort.most")
+              : t(locale, "stats.sort.least")}
+          </Button>
+          {teamProgress.map((item) => (
+            <TeamProgressRow key={item.code} item={item} />
+          ))}
+        </AnimatedTabPanel>
+      </TabSlider>
     </AppDrawer>
   );
 }

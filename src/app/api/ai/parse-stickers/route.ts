@@ -77,6 +77,7 @@ async function readParseInput(request: Request): Promise<ParseStickersInput> {
     const type = String(formData.get("type") ?? "");
     const provider = readProvider(String(formData.get("provider") ?? ""));
     const file = formData.get("file");
+    const reason = String(formData.get("reason") ?? "") || undefined;
 
     if (type !== "image" && type !== "audio") {
       throw new AiParseError(
@@ -94,6 +95,7 @@ async function readParseInput(request: Request): Promise<ParseStickersInput> {
     return {
       type,
       provider,
+      reason,
       file: {
         data: await file.arrayBuffer(),
         mimeType: normalizedMimeType,

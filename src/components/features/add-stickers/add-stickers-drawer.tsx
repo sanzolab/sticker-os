@@ -5,10 +5,7 @@ import { Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import {
-  parseVoiceTranscriptDeterministically,
-  toParseCandidate,
-} from "@/lib/ai/deterministic";
+import { analyzeVoiceSubmission } from "@/lib/voice-submit";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 import { AddStickersCaptureOptions } from "./add-stickers-capture-options";
@@ -20,10 +17,7 @@ import {
   hasPendingItems,
   useAddStickersPendingStore,
 } from "./add-stickers-session";
-import {
-  getFinalPrimaryConfidenceMinimum,
-  shouldUseDeterministicVoiceResult,
-} from "./add-stickers-voice-routing";
+
 import type {
   AddStickersError,
   AddStickersResult,
@@ -90,82 +84,15 @@ export function AddStickersDrawer({
     );
   };
 
-  const analyzeVoiceSubmission = async (submission: AddStickersVoiceSubmission) => {
-    const transcript = submission.transcript.trim();
-
-    if (!transcript) {
-      return {
-        ok: false,
-        message: t(locale, "addStickers.voice.emptyTranscript"),
-      };
+  const handleVoiceSubmission = async (submission: AddStickersVoiceSubmission) => {
+    setIsLoading(true);
+    const result = await analyzeVoiceSubmission(locale, submission);
+    if (result.ok) {
+      setModeOverride("review");
     }
-
-    const deterministic = parseVoiceTranscriptDeterministically(transcript);
-    const minimumFinalPrimaryConfidence = getFinalPrimaryConfidenceMinimum(
-      submission.finalPrimaryConfidence,
-    );
-    const canUseDeterministicOnly = shouldUseDeterministicVoiceResult({
-      candidatesCount: deterministic.candidates.length,
-      needsFallback: deterministic.needsFallback,
-      minimumFinalPrimaryConfidence,
-    });
-
-    if (canUseDeterministicOnly) {
-      mergeResult({
-        candidates: deterministic.candidates.map(toParseCandidate),
-        unresolved: [],
-        provider: "deterministic",
-        source: "text",
-      }, "review");
-
-      return { ok: true };
-    }
-
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      return {
-        ok: false,
-        message: t(locale, "addStickers.voice.offline"),
-      };
-    }
-
-    const result = submission.audioFile
-      ? await requestAnalysisResult(() => {
-        const audioFile = submission.audioFile;
-        if (!audioFile) {
-          throw new Error("Missing voice audio file");
-        }
-        const formData = new FormData();
-        formData.append("type", "audio");
-        formData.append("provider", "gemini");
-        formData.append("file", audioFile, audioFile.name);
-
-        return fetch("/api/ai/parse-stickers", {
-          method: "POST",
-          body: formData,
-        });
-      })
-      : await requestAnalysisResult(() =>
-        fetch("/api/ai/parse-stickers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "text",
-            source: "voice-transcript",
-            text: transcript,
-            provider: "gemini",
-          }),
-        }),
-      );
-
-    if (!result.ok) {
-      return {
-        ok: false,
-        message: result.error.message,
-      };
-    }
-
-    mergeResult(result.result);
-    return { ok: true };
+    setIsLoading(false);
+    setError(null);
+    return result;
   };
 
   const analyzeRequest = async (request: () => Promise<Response>) => {
@@ -287,7 +214,7 @@ export function AddStickersDrawer({
               onSubmitAudio={(file) => analyzeFile("audio", file)}
               onSubmitPhoto={(file) => analyzeFile("image", file)}
               onSubmitText={analyzeText}
-              onSubmitVoiceTranscript={analyzeVoiceSubmission}
+              onSubmitVoiceTranscript={handleVoiceSubmission}
               pendingCount={pendingCount}
               onReviewPending={() => setModeOverride("review")}
             />

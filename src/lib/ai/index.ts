@@ -4,9 +4,12 @@ export {
 export {
   normalizeStickerText,
   parseTextDeterministically,
+  parseVoiceTranscriptDeterministically,
   resolveGroupAlias,
   resolveStickerCandidate,
   resolveStickerCode,
+  toParseCandidate,
+  type DeterministicVoiceParseResult,
 } from "@/lib/ai/deterministic";
 export {
   AiParseError,

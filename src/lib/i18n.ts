@@ -158,6 +158,7 @@ const translations = {
     "addStickers.voice.upload": "Upload audio",
     "addStickers.voice.listening": "Listening...",
     "addStickers.voice.processing": "Processing voice locally first...",
+    "addStickers.voice.deepProcessing": "Deep Processing...",
     "addStickers.voice.transcriptLabel": "Transcript",
     "addStickers.voice.transcriptPlaceholder":
       "Mexico thirteen, Coca Cola fourteen, FWC zero zero",
@@ -384,6 +385,7 @@ const translations = {
     "addStickers.voice.upload": "Subir audio",
     "addStickers.voice.listening": "Escuchando...",
     "addStickers.voice.processing": "Procesando la voz localmente primero...",
+    "addStickers.voice.deepProcessing": "Procesando en profundidad...",
     "addStickers.voice.transcriptLabel": "Transcripción",
     "addStickers.voice.transcriptPlaceholder":
       "México trece, Coca Cola catorce, FWC cero cero",
