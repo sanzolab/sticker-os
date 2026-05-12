@@ -7,9 +7,11 @@ import { useAssistantStore } from "@/lib/assistant-store";
 export function GlobalSpeedDial({
   isHidden,
   hiddenProgress = 0,
+  isScrollControlled = false,
 }: {
   isHidden: boolean;
   hiddenProgress?: number;
+  isScrollControlled?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const launch = useAssistantStore((s) => s.launch);
@@ -50,6 +52,7 @@ export function GlobalSpeedDial({
           transform: `translate3d(0, ${visualProgress * 16}px, 0) scale(${1 - visualProgress * 0.04})`,
           opacity: 1 - visualProgress,
           pointerEvents: isInteractionHidden ? "none" : undefined,
+          transition: isScrollControlled ? "none" : undefined,
           willChange: "transform, opacity",
         }}
       >

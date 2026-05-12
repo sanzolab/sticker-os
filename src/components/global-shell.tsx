@@ -9,11 +9,16 @@ import { usePageScrollVisibility } from "@/lib/scroll-visibility";
 export function GlobalShell() {
   const activeMode = useAssistantStore((s) => s.activeMode);
   const isVoiceActive = activeMode === "voice";
-  const { hiddenProgress } = usePageScrollVisibility();
+  const { sharedChromeProgress, isScrollChromeActive } = usePageScrollVisibility();
+  const dialProgress = isScrollChromeActive ? sharedChromeProgress : 0;
 
   return (
     <>
-      <GlobalSpeedDial isHidden={isVoiceActive} hiddenProgress={hiddenProgress} />
+      <GlobalSpeedDial
+        isHidden={isVoiceActive}
+        hiddenProgress={dialProgress}
+        isScrollControlled={isScrollChromeActive}
+      />
       <PendingConfirmationsIndicator isHidden={isVoiceActive} />
       <VoiceAssistantOverlay />
     </>

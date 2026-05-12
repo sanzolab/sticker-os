@@ -1,18 +1,21 @@
 "use client";
 
+import { useRef, type RefObject } from "react";
 import { Plus, Repeat2, Settings, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useElementHeight } from "@/hooks/use-element-height";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
 export type ShareState = "idle" | "copied" | "downloaded";
-const TOP_BAR_HEIGHT_PX = 56;
 
 export function TopBar({
   collectionName,
   shareState,
   pendingAddStickersCount,
   hiddenProgress = 0,
+  isStickyActive = false,
+  rootRef,
   onShare,
   onAddStickers,
   onTrade,
@@ -22,21 +25,31 @@ export function TopBar({
   shareState: ShareState;
   pendingAddStickersCount: number;
   hiddenProgress?: number;
+  isStickyActive?: boolean;
+  rootRef?: RefObject<HTMLElement | null>;
   onShare: () => void;
   onAddStickers: () => void;
   onTrade: () => void;
   onSettings: () => void;
 }) {
+  const internalHeaderRef = useRef<HTMLElement | null>(null);
+  const headerRef = rootRef ?? internalHeaderRef;
+  const headerHeight = useElementHeight({ ref: headerRef });
   const locale = useStickerStore((state) => state.settings.locale);
   const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
+  const effectiveProgress = isStickyActive ? clampedProgress : 0;
 
   return (
     <header
+      ref={headerRef}
       className="fixed inset-x-0 top-0 z-40 bg-background"
       style={{
-        transform: `translate3d(0, ${-TOP_BAR_HEIGHT_PX * clampedProgress}px, 0)`,
-        opacity: 1 - clampedProgress * 0.18,
-        willChange: "transform, opacity",
+        transform: isStickyActive
+          ? `translate3d(0, ${-headerHeight * effectiveProgress}px, 0)`
+          : "none",
+        opacity: 1,
+        transition: "none",
+        willChange: isStickyActive ? "transform" : undefined,
       }}
     >
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
