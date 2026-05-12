@@ -22,7 +22,7 @@ export function TabSlider({
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  const { isSwiping } = useTabSwipe({
+  const { dragOffset, isDragging, transitionEnabled, handleTrackTransitionEnd } = useTabSwipe({
     activeIndex,
     tabCount,
     containerRef,
@@ -33,18 +33,21 @@ export function TabSlider({
   return (
     <div
       ref={containerRef}
-      className={cn("w-full overflow-hidden", className)}
+      className={cn("w-full touch-pan-y overflow-hidden", className)}
     >
       <div
         ref={trackRef}
+        className="touch-pan-y"
+        onTransitionEnd={(event) => handleTrackTransitionEnd(event.nativeEvent)}
         style={{
           display: "flex",
           width: `${tabCount * 100}%`,
-          transform: `translateX(calc(${-activeIndex * 100}% / ${tabCount}))`,
-          transition: isSwiping
-            ? "none"
-            : "transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+          transform: `translateX(calc(${-activeIndex * 100}% / ${tabCount} + ${dragOffset}px))`,
+          transition: transitionEnabled
+            ? "transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+            : "none",
           willChange: "transform",
+          cursor: isDragging ? "grabbing" : undefined,
         }}
       >
         {children}

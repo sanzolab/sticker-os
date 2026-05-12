@@ -115,11 +115,6 @@ input {
   display: none;
 }
 
-.tab-slider-panel {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-}
-
 .lazy-sticker-grid-ready {
   opacity: 0;
   transform: translateY(0.375rem);

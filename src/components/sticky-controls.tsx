@@ -25,6 +25,7 @@ export function StickyControls({
   activeTab,
   query,
   sortMode,
+  hiddenProgress = 0,
   onQueryChange,
   onSortToggle,
   onTabChange,
@@ -32,11 +33,13 @@ export function StickyControls({
   activeTab: AlbumTab;
   query: string;
   sortMode: "grouped" | "az";
+  hiddenProgress?: number;
   onQueryChange: (query: string) => void;
   onSortToggle: () => void;
   onTabChange: (tab: AlbumTab) => void;
 }) {
   const locale = useStickerStore((state) => state.settings.locale);
+  const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
   const tabs = useMemo(
     () =>
       albumTabs.map((tab) => ({
@@ -47,7 +50,14 @@ export function StickyControls({
   );
 
   return (
-    <section className="sticky top-14 z-30 -mx-4 bg-background px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <section
+      className="sticky top-14 z-30 -mx-4 bg-background px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+      style={{
+        transform: `translate3d(0, calc(${-56 * clampedProgress}px - ${100 * clampedProgress}%), 0)`,
+        opacity: 1 - clampedProgress * 0.14,
+        willChange: "transform, opacity",
+      }}
+    >
       <AnimatedTabs
         tabs={tabs}
         activeTab={activeTab}

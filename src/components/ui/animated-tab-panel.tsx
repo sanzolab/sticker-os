@@ -20,13 +20,11 @@ export function AnimatedTabPanel({
   return (
     <section
       aria-hidden={!active || undefined}
-      // @ts-expect-error inert is a new HTML attribute
-      inert={!active ? "" : undefined}
+      inert={!active || undefined}
       className={cn("tab-slider-panel", className)}
       style={{
         flex: `0 0 calc(100% / ${tabCount})`,
         minWidth: 0,
-        overflowX: "hidden",
       }}
     >
       {children}

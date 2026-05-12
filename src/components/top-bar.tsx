@@ -6,11 +6,13 @@ import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
 export type ShareState = "idle" | "copied" | "downloaded";
+const TOP_BAR_HEIGHT_PX = 56;
 
 export function TopBar({
   collectionName,
   shareState,
   pendingAddStickersCount,
+  hiddenProgress = 0,
   onShare,
   onAddStickers,
   onTrade,
@@ -19,15 +21,24 @@ export function TopBar({
   collectionName: string;
   shareState: ShareState;
   pendingAddStickersCount: number;
+  hiddenProgress?: number;
   onShare: () => void;
   onAddStickers: () => void;
   onTrade: () => void;
   onSettings: () => void;
 }) {
   const locale = useStickerStore((state) => state.settings.locale);
+  const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 bg-background">
+    <header
+      className="fixed inset-x-0 top-0 z-40 bg-background"
+      style={{
+        transform: `translate3d(0, ${-TOP_BAR_HEIGHT_PX * clampedProgress}px, 0)`,
+        opacity: 1 - clampedProgress * 0.18,
+        willChange: "transform, opacity",
+      }}
+    >
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <button className="inline-flex items-center gap-1 rounded-sm px-0.5 py-2 text-xl font-semibold tracking-normal transition-transform active:scale-[0.99] sm:text-2xl">
           {collectionName}

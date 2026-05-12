@@ -4,10 +4,19 @@ import { useState, useCallback } from "react";
 import { Plus, X, Camera, Mic } from "lucide-react";
 import { useAssistantStore } from "@/lib/assistant-store";
 
-export function GlobalSpeedDial({ isHidden }: { isHidden: boolean }) {
+export function GlobalSpeedDial({
+  isHidden,
+  hiddenProgress = 0,
+}: {
+  isHidden: boolean;
+  hiddenProgress?: number;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const launch = useAssistantStore((s) => s.launch);
   const setAddStickersOpen = useAssistantStore((s) => s.setAddStickersOpen);
+  const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
+  const visualProgress = isHidden ? 1 : clampedProgress;
+  const isInteractionHidden = isHidden || visualProgress >= 0.98;
 
   const toggle = useCallback(() => {
     setIsOpen((prev) => !prev);
@@ -30,13 +39,19 @@ export function GlobalSpeedDial({ isHidden }: { isHidden: boolean }) {
   return (
     <>
       <div
-        className={`speed-dial-overlay${isOpen && !isHidden ? " is-open" : ""}`}
+        className={`speed-dial-overlay${isOpen && !isInteractionHidden ? " is-open" : ""}`}
         onClick={dismiss}
         aria-hidden
       />
 
       <div
-        className={`speed-dial-container${isHidden ? " is-hidden" : ""}`}
+        className={`speed-dial-container${isInteractionHidden ? " is-hidden" : ""}`}
+        style={{
+          transform: `translate3d(0, ${visualProgress * 16}px, 0) scale(${1 - visualProgress * 0.04})`,
+          opacity: 1 - visualProgress,
+          pointerEvents: isInteractionHidden ? "none" : undefined,
+          willChange: "transform, opacity",
+        }}
       >
         <div className="speed-dial-actions">
           <button

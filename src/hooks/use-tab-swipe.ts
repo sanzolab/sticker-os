@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useLayoutEffect, useCallback, type RefObject } from "react";
 
-type GesturePhase = "idle" | "detecting" | "swiping" | "scrolling";
+type GesturePhase = "idle" | "detecting" | "dragging" | "scrolling";
 
 interface UseTabSwipeParams {
   activeIndex: number;
@@ -13,7 +13,11 @@ interface UseTabSwipeParams {
 }
 
 interface UseTabSwipeResult {
-  isSwiping: boolean;
+  dragOffset: number;
+  isDragging: boolean;
+  isSettling: boolean;
+  transitionEnabled: boolean;
+  handleTrackTransitionEnd: (event: TransitionEvent | Event) => void;
 }
 
 const THRESHOLD_PX = 8;
@@ -28,19 +32,40 @@ export function useTabSwipe({
   trackRef,
   onTabChange,
 }: UseTabSwipeParams): UseTabSwipeResult {
-  const [isSwiping, setIsSwiping] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isSettling, setIsSettling] = useState(false);
+  const [transitionEnabled, setTransitionEnabled] = useState(true);
 
   const phaseRef = useRef<GesturePhase>("idle");
+  const pointerIdRef = useRef<number | null>(null);
   const startXRef = useRef(0);
   const startYRef = useRef(0);
+  const startOffsetRef = useRef(0);
   const startTimeRef = useRef(0);
   const activeIndexRef = useRef(activeIndex);
   const onTabChangeRef = useRef(onTabChange);
+  const dragOffsetRef = useRef(0);
+  const isSettlingRef = useRef(false);
 
   useLayoutEffect(() => {
     activeIndexRef.current = activeIndex;
     onTabChangeRef.current = onTabChange;
   });
+
+  useEffect(() => {
+    isSettlingRef.current = isSettling;
+  }, [isSettling]);
+
+  const setDragOffsetSync = useCallback((nextOffset: number) => {
+    dragOffsetRef.current = nextOffset;
+    setDragOffset(nextOffset);
+  }, []);
+
+  const setIsSettlingSync = useCallback((nextSettling: boolean) => {
+    isSettlingRef.current = nextSettling;
+    setIsSettling(nextSettling);
+  }, []);
 
   const clampOffset = useCallback(
     (rawOffset: number) => {
@@ -59,44 +84,133 @@ export function useTabSwipe({
     [tabCount],
   );
 
+  const readTranslateX = useCallback((element: HTMLElement): number => {
+    const style = window.getComputedStyle(element);
+    const { transform } = style;
+    if (!transform || transform === "none") return 0;
+
+    if (typeof DOMMatrixReadOnly !== "undefined") {
+      try {
+        return new DOMMatrixReadOnly(transform).m41;
+      } catch {
+        // Fall through to manual parsing.
+      }
+    }
+
+    const matrixMatch = transform.match(/^matrix\((.+)\)$/);
+    if (matrixMatch) {
+      const values = matrixMatch[1]?.split(",").map((value) => Number.parseFloat(value.trim())) ?? [];
+      return values[4] ?? 0;
+    }
+
+    const matrix3dMatch = transform.match(/^matrix3d\((.+)\)$/);
+    if (matrix3dMatch) {
+      const values = matrix3dMatch[1]?.split(",").map((value) => Number.parseFloat(value.trim())) ?? [];
+      return values[12] ?? 0;
+    }
+
+    return 0;
+  }, []);
+
+  const interruptTransition = useCallback(() => {
+    if (!isSettlingRef.current) return;
+
+    const container = containerRef.current;
+    const track = trackRef.current;
+    if (!container || !track) return;
+
+    const visualTranslateX = readTranslateX(track);
+    const baseTranslateX = -activeIndexRef.current * container.clientWidth;
+    const relativeOffset = visualTranslateX - baseTranslateX;
+
+    // Freeze the visual position as a relative drag offset before the next gesture frame.
+    setTransitionEnabled(false);
+    setIsSettlingSync(false);
+    setDragOffsetSync(relativeOffset);
+  }, [containerRef, readTranslateX, setDragOffsetSync, setIsSettlingSync, trackRef]);
+
+  const endInteraction = useCallback(
+    (event: PointerEvent) => {
+      const container = containerRef.current;
+      const activePointerId = pointerIdRef.current ?? 0;
+
+      if (phaseRef.current === "dragging") {
+        const deltaX = event.clientX - startXRef.current;
+        const elapsed = Date.now() - startTimeRef.current;
+        const velocity = elapsed > 0 ? Math.abs(deltaX) / elapsed : 0;
+        const absOffset = Math.abs(dragOffsetRef.current);
+        const containerWidth = container?.clientWidth ?? 0;
+
+        const shouldChange =
+          containerWidth > 0 &&
+          (absOffset > containerWidth * SNAP_FRACTION || velocity > VELOCITY_THRESHOLD);
+
+        let didChangeTab = false;
+
+        if (shouldChange) {
+          if (dragOffsetRef.current < 0 && activeIndexRef.current < tabCount - 1) {
+            onTabChangeRef.current(activeIndexRef.current + 1);
+            didChangeTab = true;
+          } else if (dragOffsetRef.current > 0 && activeIndexRef.current > 0) {
+            onTabChangeRef.current(activeIndexRef.current - 1);
+            didChangeTab = true;
+          }
+        }
+
+        setIsDragging(false);
+        setTransitionEnabled(true);
+        setIsSettlingSync(true);
+        setDragOffsetSync(0);
+
+        if (!didChangeTab && absOffset < 0.01) {
+          setIsSettlingSync(false);
+        }
+      }
+
+      if (
+        container &&
+        typeof container.hasPointerCapture === "function" &&
+        container.hasPointerCapture(activePointerId)
+      ) {
+        container.releasePointerCapture(activePointerId);
+      }
+
+      pointerIdRef.current = null;
+      phaseRef.current = "idle";
+    },
+    [containerRef, setDragOffsetSync, setIsSettlingSync, tabCount],
+  );
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const getClientX = (e: TouchEvent | MouseEvent): number => {
-      if ("touches" in e) {
-        if (e.type === "touchend" || e.type === "touchcancel") {
-          return (e as TouchEvent).changedTouches[0]?.clientX ?? 0;
-        }
-        return (e as TouchEvent).touches[0]?.clientX ?? 0;
-      }
-      return (e as MouseEvent).clientX;
+    const getPointerId = (event: PointerEvent) => {
+      if (typeof event.pointerId === "number") return event.pointerId;
+      return 0;
     };
 
-    const getClientY = (e: TouchEvent | MouseEvent): number => {
-      if ("touches" in e) {
-        if (e.type === "touchend" || e.type === "touchcancel") {
-          return (e as TouchEvent).changedTouches[0]?.clientY ?? 0;
-        }
-        return (e as TouchEvent).touches[0]?.clientY ?? 0;
-      }
-      return (e as MouseEvent).clientY;
-    };
+    const isActivePointer = (event: PointerEvent) =>
+      pointerIdRef.current !== null && getPointerId(event) === pointerIdRef.current;
 
-    const handleStart = (e: TouchEvent | MouseEvent) => {
-      if (!("touches" in e) && (e as MouseEvent).button !== 0) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (pointerIdRef.current !== null) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
 
-      startXRef.current = getClientX(e);
-      startYRef.current = getClientY(e);
+      pointerIdRef.current = getPointerId(event);
+      startXRef.current = event.clientX;
+      startYRef.current = event.clientY;
+      startOffsetRef.current = dragOffsetRef.current;
       startTimeRef.current = Date.now();
       phaseRef.current = "detecting";
     };
 
-    const handleMove = (e: TouchEvent | MouseEvent) => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!isActivePointer(event)) return;
       if (phaseRef.current === "idle" || phaseRef.current === "scrolling") return;
 
-      const x = getClientX(e);
-      const y = getClientY(e);
+      const x = event.clientX;
+      const y = event.clientY;
       const deltaX = x - startXRef.current;
       const deltaY = y - startYRef.current;
 
@@ -105,8 +219,15 @@ export function useTabSwipe({
         const absY = Math.abs(deltaY);
 
         if (absX > absY && absX > THRESHOLD_PX) {
-          phaseRef.current = "swiping";
-          setIsSwiping(true);
+          interruptTransition();
+          startOffsetRef.current = dragOffsetRef.current;
+          phaseRef.current = "dragging";
+          setTransitionEnabled(false);
+          setIsSettlingSync(false);
+          setIsDragging(true);
+          if (typeof container.setPointerCapture === "function") {
+            container.setPointerCapture(getPointerId(event));
+          }
         } else if (absY > absX && absY > THRESHOLD_PX) {
           phaseRef.current = "scrolling";
           return;
@@ -115,72 +236,56 @@ export function useTabSwipe({
         }
       }
 
-      if (phaseRef.current === "swiping") {
-        e.preventDefault();
-
-        const clamped = clampOffset(deltaX);
-
-        if (trackRef.current) {
-          const basePercent = -(activeIndexRef.current * 100) / tabCount;
-          trackRef.current.style.transform = `translateX(calc(${basePercent}% + ${clamped}px))`;
+      if (phaseRef.current === "dragging") {
+        if (event.cancelable) {
+          event.preventDefault();
         }
+        const rawOffset = startOffsetRef.current + deltaX;
+        const clamped = clampOffset(rawOffset);
+        setDragOffsetSync(clamped);
       }
     };
 
-    const handleEnd = (e: TouchEvent | MouseEvent) => {
-      if (phaseRef.current !== "swiping") {
-        phaseRef.current = "idle";
-        return;
-      }
-
-      const x = getClientX(e);
-      const deltaX = x - startXRef.current;
-      const elapsed = Date.now() - startTimeRef.current;
-      const velocity = elapsed > 0 ? Math.abs(deltaX) / elapsed : 0;
-
-      const containerWidth = container.clientWidth;
-      const clamped = clampOffset(deltaX);
-      const absOffset = Math.abs(clamped);
-
-      const shouldChange =
-        containerWidth > 0 &&
-        (absOffset > containerWidth * SNAP_FRACTION || velocity > VELOCITY_THRESHOLD);
-
-      if (shouldChange) {
-        if (deltaX < 0 && activeIndexRef.current < tabCount - 1) {
-          onTabChangeRef.current(activeIndexRef.current + 1);
-        } else if (deltaX > 0 && activeIndexRef.current > 0) {
-          onTabChangeRef.current(activeIndexRef.current - 1);
-        }
-      }
-
-      if (trackRef.current) {
-        trackRef.current.style.transform = "";
-      }
-
-      setIsSwiping(false);
-      phaseRef.current = "idle";
+    const handlePointerUp = (event: PointerEvent) => {
+      if (!isActivePointer(event)) return;
+      endInteraction(event);
     };
 
-    container.addEventListener("touchstart", handleStart, { passive: true });
-    container.addEventListener("touchmove", handleMove, { passive: false });
-    container.addEventListener("touchend", handleEnd);
-    container.addEventListener("touchcancel", handleEnd);
+    const handlePointerCancel = (event: PointerEvent) => {
+      if (!isActivePointer(event)) return;
+      endInteraction(event);
+    };
 
-    container.addEventListener("mousedown", handleStart as EventListener);
-    document.addEventListener("mousemove", handleMove as EventListener);
-    document.addEventListener("mouseup", handleEnd as EventListener);
+    container.addEventListener("pointerdown", handlePointerDown);
+    container.addEventListener("pointermove", handlePointerMove, { passive: false });
+    container.addEventListener("pointerup", handlePointerUp);
+    container.addEventListener("pointercancel", handlePointerCancel);
+    document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("pointercancel", handlePointerCancel);
 
     return () => {
-      container.removeEventListener("touchstart", handleStart);
-      container.removeEventListener("touchmove", handleMove);
-      container.removeEventListener("touchend", handleEnd);
-      container.removeEventListener("touchcancel", handleEnd);
-      container.removeEventListener("mousedown", handleStart as EventListener);
-      document.removeEventListener("mousemove", handleMove as EventListener);
-      document.removeEventListener("mouseup", handleEnd as EventListener);
+      container.removeEventListener("pointerdown", handlePointerDown);
+      container.removeEventListener("pointermove", handlePointerMove);
+      container.removeEventListener("pointerup", handlePointerUp);
+      container.removeEventListener("pointercancel", handlePointerCancel);
+      document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("pointercancel", handlePointerCancel);
     };
-  }, [containerRef, tabCount, onTabChange, clampOffset, trackRef]);
+  }, [clampOffset, containerRef, endInteraction, interruptTransition, setDragOffsetSync, setIsSettlingSync]);
 
-  return { isSwiping };
+  const handleTrackTransitionEnd = useCallback((event: TransitionEvent | Event) => {
+    const transitionEvent = event as TransitionEvent;
+    if (transitionEvent.propertyName && transitionEvent.propertyName !== "transform") {
+      return;
+    }
+    setIsSettlingSync(false);
+  }, [setIsSettlingSync]);
+
+  return {
+    dragOffset,
+    isDragging,
+    isSettling,
+    transitionEnabled,
+    handleTrackTransitionEnd,
+  };
 }

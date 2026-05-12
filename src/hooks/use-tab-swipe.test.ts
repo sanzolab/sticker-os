@@ -3,19 +3,20 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act } from "@testing-library/react";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { useTabSwipe } from "./use-tab-swipe";
 
-interface FakeTouch {
-  clientX: number;
-  clientY: number;
+interface PointerDispatchResult {
+  preventDefault: ReturnType<typeof vi.fn>;
 }
 
-function createContainer(): {
-  container: HTMLDivElement;
-  track: HTMLDivElement;
-} {
+type PointerMethods = HTMLDivElement & {
+  hasPointerCapture: ReturnType<typeof vi.fn>;
+  setPointerCapture: ReturnType<typeof vi.fn>;
+  releasePointerCapture: ReturnType<typeof vi.fn>;
+};
+
+function createContainer(): { container: HTMLDivElement; track: HTMLDivElement } {
   const container = document.createElement("div");
   const track = document.createElement("div");
   container.appendChild(track);
@@ -26,59 +27,81 @@ function createContainer(): {
     configurable: true,
   });
 
+  // jsdom may not fully implement pointer capture methods.
+  (container as HTMLDivElement & {
+    hasPointerCapture: (pointerId: number) => boolean;
+    setPointerCapture: (pointerId: number) => void;
+    releasePointerCapture: (pointerId: number) => void;
+  }).hasPointerCapture = vi.fn(() => false);
+  (container as HTMLDivElement & {
+    setPointerCapture: (pointerId: number) => void;
+  }).setPointerCapture = vi.fn();
+  (container as HTMLDivElement & {
+    releasePointerCapture: (pointerId: number) => void;
+  }).releasePointerCapture = vi.fn();
+
   return { container, track };
 }
 
-function dispatchTouchEvent(
-  el: HTMLElement,
-  type: "touchstart" | "touchmove" | "touchend" | "touchcancel",
-  clientX: number,
-  clientY: number,
-): { event: Event; preventDefault: ReturnType<typeof vi.fn> } {
-  const preventDefault = vi.fn();
-  const touch: FakeTouch = { clientX, clientY };
-
-  const event = new Event(type, { bubbles: true, cancelable: true }) as Event & {
-    touches: FakeTouch[];
-    changedTouches: FakeTouch[];
-    preventDefault: () => void;
-  };
-
-  event.touches =
-    type === "touchend" || type === "touchcancel" ? [] : [touch];
-  event.changedTouches = [touch];
-  event.preventDefault = preventDefault;
-
-  el.dispatchEvent(event);
-
-  return { event, preventDefault };
+function getPointerMethods(container: HTMLDivElement): PointerMethods {
+  return container as PointerMethods;
 }
 
-function dispatchMouseEvent(
-  el: HTMLElement | Document,
-  type: "mousedown" | "mouseup" | "mousemove",
-  clientX: number,
-  clientY: number,
-  button = 0,
-): { event: MouseEvent; preventDefault: ReturnType<typeof vi.fn> } {
-  const preventDefault = vi.fn();
-
-  const event = new MouseEvent(type, {
+function dispatchPointerEvent(
+  target: HTMLElement | Document,
+  type: "pointerdown" | "pointermove" | "pointerup" | "pointercancel",
+  {
     clientX,
     clientY,
-    button,
-    bubbles: true,
-    cancelable: true,
-  });
+    pointerId = 1,
+    pointerType = "touch",
+    button = 0,
+  }: {
+    clientX: number;
+    clientY: number;
+    pointerId?: number;
+    pointerType?: string;
+    button?: number;
+  },
+): PointerDispatchResult {
+  const preventDefault = vi.fn();
+  const event =
+    typeof PointerEvent !== "undefined"
+      ? new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+          pointerId,
+          pointerType,
+          button,
+        })
+      : (new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+          button,
+        }) as MouseEvent & {
+          pointerId: number;
+          pointerType: string;
+        });
+
+  if (!("pointerId" in event)) {
+    Object.defineProperty(event, "pointerId", { value: pointerId, configurable: true });
+  }
+
+  if (!("pointerType" in event)) {
+    Object.defineProperty(event, "pointerType", { value: pointerType, configurable: true });
+  }
 
   Object.defineProperty(event, "preventDefault", {
     value: preventDefault,
-    writable: true,
+    configurable: true,
   });
 
-  el.dispatchEvent(event);
-
-  return { event, preventDefault };
+  target.dispatchEvent(event);
+  return { preventDefault };
 }
 
 describe("useTabSwipe", () => {
@@ -96,13 +119,14 @@ describe("useTabSwipe", () => {
 
   afterEach(() => {
     document.body.innerHTML = "";
+    vi.restoreAllMocks();
   });
 
   function render(activeIndex = 0, tabCount = 4) {
     const containerRef = { current: container } as const;
     const trackRef = { current: track } as const;
 
-    return renderHook(
+    const hook = renderHook(
       ({ ai, tc }: { ai: number; tc: number }) =>
         useTabSwipe({
           activeIndex: ai,
@@ -115,358 +139,225 @@ describe("useTabSwipe", () => {
         initialProps: { ai: activeIndex, tc: tabCount },
       },
     );
+
+    act(() => {});
+    return hook;
   }
 
-  describe("initial state", () => {
-    it("returns isSwiping as false", () => {
-      const { result } = render();
-      expect(result.current.isSwiping).toBe(false);
+  it("changes to next tab on a normal left swipe", () => {
+    render(0, 4);
+
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200 });
+      dispatchPointerEvent(container, "pointermove", { clientX: -80, clientY: 204 });
+      dispatchPointerEvent(container, "pointerup", { clientX: -80, clientY: 204 });
     });
+
+    expect(onTabChange).toHaveBeenCalledTimes(1);
+    expect(onTabChange).toHaveBeenCalledWith(1);
   });
 
-  describe("touch gesture detection", () => {
-    it("enters swiping phase on horizontal drag > 8px", () => {
-      const { result } = render();
+  it("changes to previous tab on a normal right swipe", () => {
+    render(2, 4);
 
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 120, 202);
-      });
-
-      expect(result.current.isSwiping).toBe(true);
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200 });
+      dispatchPointerEvent(container, "pointermove", { clientX: 280, clientY: 198 });
+      dispatchPointerEvent(container, "pointerup", { clientX: 280, clientY: 198 });
     });
 
-    it("enters scrolling phase on vertical drag > 8px", () => {
-      const { result } = render();
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 102, 220);
-      });
-
-      expect(result.current.isSwiping).toBe(false);
-    });
-
-    it("stays detecting when drag is < 8px", () => {
-      const { result } = render();
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 106, 204);
-      });
-
-      expect(result.current.isSwiping).toBe(false);
-    });
-
-    it("calls preventDefault on horizontal swipe move", () => {
-      render();
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      const { preventDefault } = (() => {
-        let result: ReturnType<typeof dispatchTouchEvent> = {
-          event: new Event("touchmove"),
-          preventDefault: vi.fn(),
-        };
-        act(() => {
-          result = dispatchTouchEvent(container, "touchmove", 120, 202);
-        });
-        return result;
-      })();
-
-      expect(preventDefault).toHaveBeenCalled();
-    });
-
-    it("does not call preventDefault when entering scrolling phase", () => {
-      render();
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      const { preventDefault } = (() => {
-        let result = dispatchTouchEvent(container, "touchmove", 102, 220);
-        result = result;
-        return result;
-      })();
-
-      expect(preventDefault).not.toHaveBeenCalled();
-    });
+    expect(onTabChange).toHaveBeenCalledTimes(1);
+    expect(onTabChange).toHaveBeenCalledWith(1);
   });
 
-  describe("swipe direction", () => {
-    it("horizontal swipe takes precedence when both axes exceed threshold", () => {
-      const { result } = render();
+  it("does not change tab for a short drag and settles back", () => {
+    const { result } = render(1, 4);
+    vi.spyOn(Date, "now")
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_120);
 
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 120, 215);
-      });
-
-      expect(result.current.isSwiping).toBe(true);
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200 });
+      dispatchPointerEvent(container, "pointermove", { clientX: 120, clientY: 202 });
+      dispatchPointerEvent(container, "pointerup", { clientX: 120, clientY: 202 });
     });
+
+    expect(onTabChange).not.toHaveBeenCalled();
+    expect(result.current.isSettling).toBe(true);
+    expect(result.current.transitionEnabled).toBe(true);
+    expect(result.current.dragOffset).toBe(0);
   });
 
-  describe("snap behavior on release", () => {
-    it("changes to next tab when drag exceeds 35% of container width", () => {
-      render(0, 4);
+  it("locks to vertical scroll and does not prevent default", () => {
+    const { result } = render(1, 4);
 
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", -50, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchend", -50, 202);
-      });
-
-      expect(onTabChange).toHaveBeenCalledWith(1);
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200 });
     });
 
-    it("snaps back when drag is less than 35%", () => {
-      const now = vi.spyOn(Date, "now");
-      let t = 0;
-      now.mockImplementation(() => t);
-
-      render(0, 4);
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      t = 300;
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", -30, 202);
-      });
-
-      t = 600;
-      act(() => {
-        dispatchTouchEvent(container, "touchend", -30, 202);
-      });
-
-      expect(onTabChange).not.toHaveBeenCalled();
-      now.mockRestore();
+    const move = dispatchPointerEvent(container, "pointermove", {
+      clientX: 104,
+      clientY: 224,
     });
 
-    it("swipes right to previous tab", () => {
-      render(1, 4);
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 260, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchend", 260, 202);
-      });
-
-      expect(onTabChange).toHaveBeenCalledWith(0);
-    });
+    expect(move.preventDefault).not.toHaveBeenCalled();
+    expect(getPointerMethods(container).setPointerCapture).not.toHaveBeenCalled();
+    expect(result.current.isDragging).toBe(false);
+    expect(result.current.dragOffset).toBe(0);
   });
 
-  describe("edge rubber-banding", () => {
-    it("does not tab change past first tab", () => {
-      render(0, 4);
+  it("keeps vertical lock for the entire gesture even with later horizontal jitter", () => {
+    render(1, 4);
 
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 200, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchend", 200, 202);
-      });
-
-      expect(onTabChange).not.toHaveBeenCalled();
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200, pointerId: 7 });
     });
 
-    it("does not tab change past last tab", () => {
-      render(3, 4);
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 0, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchend", 0, 202);
-      });
-
-      expect(onTabChange).not.toHaveBeenCalled();
+    const verticalMove = dispatchPointerEvent(container, "pointermove", {
+      clientX: 103,
+      clientY: 225,
+      pointerId: 7,
+    });
+    const jitterMove = dispatchPointerEvent(container, "pointermove", {
+      clientX: 170,
+      clientY: 228,
+      pointerId: 7,
     });
 
-    it("applies clamped transform to track during edge drag", () => {
-      render(0, 4);
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-
-      // First move: detect swipe
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 120, 202);
-      });
-
-      // Second move: drag further right to trigger rubber-band
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 200, 202);
-      });
-
-      // At tab 0 dragging right 100px from start (100px extra) → clamped = 100 * 0.2 = 20px
-      expect(track.style.transform).toContain("20px");
+    act(() => {
+      dispatchPointerEvent(container, "pointerup", { clientX: 170, clientY: 228, pointerId: 7 });
     });
+
+    expect(verticalMove.preventDefault).not.toHaveBeenCalled();
+    expect(jitterMove.preventDefault).not.toHaveBeenCalled();
+    expect(getPointerMethods(container).setPointerCapture).not.toHaveBeenCalled();
+    expect(onTabChange).not.toHaveBeenCalled();
   });
 
-  describe("touch end cleanup", () => {
-    it("clears track transform on touchend", () => {
-      render(0, 4);
+  it("prevents default only after horizontal lock is confirmed", () => {
+    const { result } = render(1, 4);
 
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 140, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 180, 202);
-      });
-
-      expect(track.style.transform).not.toBe("");
-
-      act(() => {
-        dispatchTouchEvent(container, "touchend", 180, 202);
-      });
-
-      expect(track.style.transform).toBe("");
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200 });
     });
 
-    it("resets isSwiping on touchend", () => {
-      const { result } = render(0, 4);
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
+    let move: PointerDispatchResult = { preventDefault: vi.fn() };
+    act(() => {
+      move = dispatchPointerEvent(container, "pointermove", {
+        clientX: 130,
+        clientY: 203,
       });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 120, 202);
-      });
-      expect(result.current.isSwiping).toBe(true);
-
-      act(() => {
-        dispatchTouchEvent(container, "touchend", 120, 202);
-      });
-
-      expect(result.current.isSwiping).toBe(false);
     });
+
+    expect(move.preventDefault).toHaveBeenCalled();
+    expect(getPointerMethods(container).setPointerCapture).toHaveBeenCalledTimes(1);
+    expect(result.current.isDragging).toBe(true);
   });
 
-  describe("touch cancel", () => {
-    it("handles touchcancel like touchend", () => {
-      const { result } = render(0, 4);
+  it("does not interrupt settle on pointerdown and only interrupts after horizontal lock", () => {
+    const { result } = render(1, 4);
 
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 120, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchcancel", 120, 202);
-      });
-
-      expect(result.current.isSwiping).toBe(false);
-      expect(track.style.transform).toBe("");
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200, pointerId: 1 });
+      dispatchPointerEvent(container, "pointermove", { clientX: 130, clientY: 202, pointerId: 1 });
+      dispatchPointerEvent(container, "pointerup", { clientX: 130, clientY: 202, pointerId: 1 });
     });
+
+    expect(result.current.isSettling).toBe(true);
+
+    const computedStyleSpy = vi.spyOn(window, "getComputedStyle").mockReturnValue({
+      transform: "matrix(1, 0, 0, 1, -350, 0)",
+    } as CSSStyleDeclaration);
+    getPointerMethods(container).setPointerCapture.mockClear();
+
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 200, clientY: 200, pointerId: 2 });
+    });
+
+    expect(computedStyleSpy).not.toHaveBeenCalled();
+    expect(getPointerMethods(container).setPointerCapture).not.toHaveBeenCalled();
+    expect(result.current.isSettling).toBe(true);
+
+    act(() => {
+      dispatchPointerEvent(container, "pointermove", { clientX: 220, clientY: 200, pointerId: 2 });
+    });
+
+    expect(computedStyleSpy).toHaveBeenCalledTimes(1);
+    expect(getPointerMethods(container).setPointerCapture).toHaveBeenCalledTimes(1);
+    expect(result.current.transitionEnabled).toBe(false);
+    expect(result.current.isSettling).toBe(false);
+    expect(result.current.isDragging).toBe(true);
+    expect(result.current.dragOffset).toBeCloseTo(70, 3);
   });
 
-  describe("mouse support", () => {
-    it("enters swiping phase on mouse drag > 8px with left button", () => {
-      const { result } = render(0, 4);
+  it("applies symmetric edge resistance and snap-back at first and last tabs", () => {
+    const first = render(0, 4);
 
-      act(() => {
-        dispatchMouseEvent(container, "mousedown", 100, 200);
-      });
-      act(() => {
-        dispatchMouseEvent(document, "mousemove", 120, 202);
-      });
-
-      expect(result.current.isSwiping).toBe(true);
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200, pointerId: 1 });
+      dispatchPointerEvent(container, "pointermove", { clientX: 200, clientY: 200, pointerId: 1 });
     });
 
-    it("ignores mousedown with non-left button", () => {
-      const { result } = render(0, 4);
+    const firstEdgeOffset = first.result.current.dragOffset;
+    expect(firstEdgeOffset).toBeCloseTo(20, 3);
 
-      act(() => {
-        dispatchMouseEvent(container, "mousedown", 100, 200, 2);
-      });
-      act(() => {
-        dispatchMouseEvent(document, "mousemove", 120, 202);
-      });
-
-      expect(result.current.isSwiping).toBe(false);
+    act(() => {
+      dispatchPointerEvent(container, "pointerup", { clientX: 200, clientY: 200, pointerId: 1 });
     });
 
-    it("resets isSwiping on mouseup", () => {
-      const { result } = render(0, 4);
+    expect(onTabChange).not.toHaveBeenCalled();
+    expect(first.result.current.isSettling).toBe(true);
 
-      act(() => {
-        dispatchMouseEvent(container, "mousedown", 100, 200);
-      });
-      act(() => {
-        dispatchMouseEvent(document, "mousemove", 120, 202);
-      });
-      expect(result.current.isSwiping).toBe(true);
+    first.unmount();
+    document.body.innerHTML = "";
+    const elements = createContainer();
+    container = elements.container;
+    track = elements.track;
+    document.body.appendChild(container);
 
-      act(() => {
-        dispatchMouseEvent(document, "mouseup", 120, 202);
-      });
+    const last = render(3, 4);
 
-      expect(result.current.isSwiping).toBe(false);
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200, pointerId: 2 });
+      dispatchPointerEvent(container, "pointermove", { clientX: 0, clientY: 200, pointerId: 2 });
     });
+
+    const lastEdgeOffset = last.result.current.dragOffset;
+    expect(lastEdgeOffset).toBeCloseTo(-20, 3);
+    expect(Math.abs(lastEdgeOffset)).toBeCloseTo(Math.abs(firstEdgeOffset), 3);
+
+    act(() => {
+      dispatchPointerEvent(container, "pointerup", { clientX: 0, clientY: 200, pointerId: 2 });
+    });
+
+    expect(onTabChange).not.toHaveBeenCalled();
+    expect(last.result.current.isSettling).toBe(true);
   });
 
-  describe("multiple sequential gestures", () => {
-    it("handles multiple swipes in sequence", () => {
-      const { result } = render(0, 4);
+  it("does not stack duplicate tab changes across rapid sequential swipes", () => {
+    const { rerender, result } = render(0, 4);
 
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 120, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchend", 120, 202);
-      });
-      expect(result.current.isSwiping).toBe(false);
-
-      act(() => {
-        dispatchTouchEvent(container, "touchstart", 100, 200);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchmove", 80, 202);
-      });
-      act(() => {
-        dispatchTouchEvent(container, "touchend", 80, 202);
-      });
-      expect(result.current.isSwiping).toBe(false);
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200, pointerId: 1 });
+      dispatchPointerEvent(container, "pointermove", { clientX: -80, clientY: 200, pointerId: 1 });
+      dispatchPointerEvent(container, "pointerup", { clientX: -80, clientY: 200, pointerId: 1 });
     });
+
+    expect(onTabChange).toHaveBeenCalledTimes(1);
+    expect(onTabChange).toHaveBeenLastCalledWith(1);
+
+    rerender({ ai: 1, tc: 4 });
+    act(() => {
+      result.current.handleTrackTransitionEnd(new Event("transitionend"));
+    });
+
+    act(() => {
+      dispatchPointerEvent(container, "pointerdown", { clientX: 100, clientY: 200, pointerId: 2 });
+      dispatchPointerEvent(container, "pointermove", { clientX: -80, clientY: 200, pointerId: 2 });
+      dispatchPointerEvent(container, "pointerup", { clientX: -80, clientY: 200, pointerId: 2 });
+    });
+
+    expect(onTabChange).toHaveBeenCalledTimes(2);
+    expect(onTabChange).toHaveBeenLastCalledWith(2);
   });
 });

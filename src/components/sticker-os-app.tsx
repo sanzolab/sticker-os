@@ -12,6 +12,7 @@ import { StickyControls, albumTabs, type AlbumTab } from "@/components/sticky-co
 import { TopBar, type ShareState } from "@/components/top-bar";
 import { TradeDrawer } from "@/components/trade-drawer";
 import { useAssistantStore } from "@/lib/assistant-store";
+import { usePageScrollVisibility } from "@/lib/scroll-visibility";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
 import { useAddStickersPendingStore } from "@/components/features/add-stickers/add-stickers-session";
 import type { Sticker } from "@/lib/sticker-data";
@@ -37,6 +38,7 @@ export function StickerOSApp() {
   const setQuery = useStickerStore((state) => state.setSearchQuery);
   const locale = useStickerStore((state) => state.settings.locale);
   const stats = useCollectionStats();
+  const { hiddenProgress } = usePageScrollVisibility();
   const pendingAddStickersCount = useAddStickersPendingStore(
     (state) => state.candidates.length,
   );
@@ -93,6 +95,7 @@ export function StickerOSApp() {
         collectionName={collectionName}
         shareState={shareState}
         pendingAddStickersCount={pendingAddStickersCount}
+        hiddenProgress={hiddenProgress}
         onShare={handleShareOpen}
         onAddStickers={handleAddStickersOpen}
         onTrade={handleTradeOpen}
@@ -107,6 +110,7 @@ export function StickerOSApp() {
           activeTab={activeTab}
           query={query}
           sortMode={sortMode}
+          hiddenProgress={hiddenProgress}
           onQueryChange={setQuery}
           onSortToggle={handleSortToggle}
           onTabChange={handleTabChange}
