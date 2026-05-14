@@ -146,6 +146,15 @@ const translations = {
     "addStickers.photo.description":
       "Take or upload a photo where sticker numbers and codes are visible.",
     "addStickers.photo.button": "Choose photo",
+    "addStickers.photoPanel.title": "Capture photo",
+    "addStickers.photoPanel.description":
+      "Upload or capture an image with visible sticker codes and numbers.",
+    "addStickers.photoPanel.dropLabel": "Add image",
+    "addStickers.photoPanel.dropTitle": "Add image",
+    "addStickers.photoPanel.dropHint": "PNG, JPG, or direct photo capture",
+    "addStickers.photoPanel.takePhoto": "Take photo",
+    "addStickers.photoPanel.chooseFromGallery": "Choose from gallery",
+    "addStickers.photoPanel.close": "Close photo panel",
     "addStickers.voice.title": "Voice",
     "addStickers.voice.description":
       "Say several stickers in one sentence. You will review everything before adding.",
@@ -373,6 +382,15 @@ const translations = {
     "addStickers.photo.description":
       "Toma o sube una foto donde se vean los números y códigos de las figuritas.",
     "addStickers.photo.button": "Elegir foto",
+    "addStickers.photoPanel.title": "Capturar foto",
+    "addStickers.photoPanel.description":
+      "Sube o toma una imagen donde se vean los códigos y números de figuritas.",
+    "addStickers.photoPanel.dropLabel": "Agregar imagen",
+    "addStickers.photoPanel.dropTitle": "Agregar imagen",
+    "addStickers.photoPanel.dropHint": "PNG, JPG o foto directa",
+    "addStickers.photoPanel.takePhoto": "Tomar foto",
+    "addStickers.photoPanel.chooseFromGallery": "Elegir de galería",
+    "addStickers.photoPanel.close": "Cerrar panel de foto",
     "addStickers.voice.title": "Voz",
     "addStickers.voice.description":
       "Di varias figuritas en una sola frase. Revisarás todo antes de agregar.",

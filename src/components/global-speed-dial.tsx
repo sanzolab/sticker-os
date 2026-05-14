@@ -15,7 +15,6 @@ export function GlobalSpeedDial({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const launch = useAssistantStore((s) => s.launch);
-  const setAddStickersOpen = useAssistantStore((s) => s.setAddStickersOpen);
   const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
   const visualProgress = isHidden ? 1 : clampedProgress;
   const isInteractionHidden = isHidden || visualProgress >= 0.98;
@@ -30,8 +29,8 @@ export function GlobalSpeedDial({
 
   const handleCamera = useCallback(() => {
     setIsOpen(false);
-    setAddStickersOpen(true);
-  }, [setAddStickersOpen]);
+    launch("photo");
+  }, [launch]);
 
   const handleVoice = useCallback(() => {
     setIsOpen(false);

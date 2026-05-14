@@ -403,6 +403,39 @@ input {
    Immersive Voice Overlay
    ────────────────────────────────────────────── */
 
+.photo-capture-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: block;
+  background: color-mix(in oklab, var(--background) 55%, black);
+  animation: immersive-overlay-in 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.photo-capture-overlay.out {
+  animation: immersive-overlay-out 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  pointer-events: none;
+}
+
+.photo-capture-panel {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  max-height: none;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.24);
+  animation: photo-capture-panel-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.photo-capture-panel.out {
+  animation: photo-capture-panel-out 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .immersive-overlay {
   position: fixed;
   inset: 0;
@@ -435,6 +468,24 @@ input {
   }
   to {
     opacity: 0;
+  }
+}
+
+@keyframes photo-capture-panel-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes photo-capture-panel-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
   }
 }
 
@@ -717,6 +768,13 @@ input {
 
   .immersive-overlay,
   .immersive-overlay.out {
+    animation: none;
+  }
+
+  .photo-capture-overlay,
+  .photo-capture-overlay.out,
+  .photo-capture-panel,
+  .photo-capture-panel.out {
     animation: none;
   }
 

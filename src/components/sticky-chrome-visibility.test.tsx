@@ -65,7 +65,7 @@ describe("sticky chrome visibility styles", () => {
     expect(header?.style.willChange).toBe("");
   });
 
-  it("keeps top bar static while tabs stage is in flight", () => {
+  it("keeps top bar visible in sticky mode before hide threshold", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
@@ -82,13 +82,60 @@ describe("sticky chrome visibility styles", () => {
 
     const header = container.querySelector("header");
     expect(header).not.toBeNull();
-    expect(header?.style.transform).toBe("translate3d(0, 0px, 0)");
+    expect(header?.style.transform).toBe("translate3d(0, 0, 0)");
     expect(header?.style.opacity).toBe("1");
-    expect(header?.style.transition).toBe("none");
+    expect(header?.style.transitionProperty).toBe("transform");
+    expect(header?.style.transitionDuration).toBe("280ms");
+    expect(header?.style.transitionTimingFunction).toBe("cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(header?.style.transitionDelay).toBe("0ms");
+    expect(header?.style.willChange).toBe("transform");
   });
 
-  it("applies measured pixel translation to the top bar in header stage", () => {
+  it("snaps top bar hidden once the hide threshold is crossed", () => {
     const { container } = render(
+      <TopBar
+        collectionName="StickerOS"
+        shareState="idle"
+        pendingAddStickersCount={0}
+        hiddenProgress={0.6}
+        isStickyActive
+        onShare={vi.fn()}
+        onAddStickers={vi.fn()}
+        onTrade={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    const header = container.querySelector("header");
+    expect(header).not.toBeNull();
+    expect(header?.style.transform).toBe("translate3d(0, -100%, 0)");
+    expect(header?.style.opacity).toBe("1");
+    expect(header?.style.transitionProperty).toBe("transform");
+    expect(header?.style.transitionDuration).toBe("280ms");
+    expect(header?.style.transitionTimingFunction).toBe("cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(header?.style.transitionDelay).toBe("80ms");
+  });
+
+  it("keeps top bar hidden inside hysteresis band until show threshold is crossed", () => {
+    const { container, rerender } = render(
+      <TopBar
+        collectionName="StickerOS"
+        shareState="idle"
+        pendingAddStickersCount={0}
+        hiddenProgress={0.6}
+        isStickyActive
+        onShare={vi.fn()}
+        onAddStickers={vi.fn()}
+        onTrade={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    const header = container.querySelector("header");
+    expect(header).not.toBeNull();
+    expect(header?.style.transform).toBe("translate3d(0, -100%, 0)");
+
+    rerender(
       <TopBar
         collectionName="StickerOS"
         shareState="idle"
@@ -102,11 +149,24 @@ describe("sticky chrome visibility styles", () => {
       />,
     );
 
-    const header = container.querySelector("header");
-    expect(header).not.toBeNull();
-    expect(header?.style.transform).toBe("translate3d(0, -40px, 0)");
-    expect(header?.style.opacity).toBe("1");
-    expect(header?.style.transition).toBe("none");
+    expect(header?.style.transform).toBe("translate3d(0, -100%, 0)");
+
+    rerender(
+      <TopBar
+        collectionName="StickerOS"
+        shareState="idle"
+        pendingAddStickersCount={0}
+        hiddenProgress={0.4}
+        isStickyActive
+        onShare={vi.fn()}
+        onAddStickers={vi.fn()}
+        onTrade={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    expect(header?.style.transform).toBe("translate3d(0, 0, 0)");
+    expect(header?.style.transitionDelay).toBe("0ms");
   });
 
   it("renders sticky controls as a layout slot, sticky shell, and transform layer", () => {
@@ -157,7 +217,7 @@ describe("sticky chrome visibility styles", () => {
     expect(transformLayer?.style.willChange).toBe("");
   });
 
-  it("uses measured hidden offset only on the sticky controls transform layer", () => {
+  it("uses measured hidden offsets for sticky shell and transform layer when hidden", () => {
     const { container } = render(
       <StickyControls
         activeTab="all"
@@ -177,11 +237,18 @@ describe("sticky chrome visibility styles", () => {
     const transformLayer = container.querySelector<HTMLElement>(".sticky-controls-transform-layer");
 
     expect(layoutSlot?.style.transform).toBe("");
-    expect(stickyShell?.style.transform).toMatch(/^translate3d/);
+    expect(stickyShell?.style.transform).toBe("translate3d(0, -64px, 0)");
     expect(stickyShell?.style.willChange).toBe("transform");
+    expect(stickyShell?.style.transitionProperty).toBe("transform");
+    expect(stickyShell?.style.transitionDuration).toBe("280ms");
+    expect(stickyShell?.style.transitionTimingFunction).toBe("cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(stickyShell?.style.transitionDelay).toBe("0ms");
     expect(transformLayer).not.toBeNull();
     expect(transformLayer?.style.transform).toBe("translate3d(0, -144px, 0)");
-    expect(transformLayer?.style.transition).toBe("none");
+    expect(transformLayer?.style.transitionProperty).toBe("transform");
+    expect(transformLayer?.style.transitionDuration).toBe("280ms");
+    expect(transformLayer?.style.transitionTimingFunction).toBe("cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(transformLayer?.style.transitionDelay).toBe("0ms");
     expect(transformLayer?.style.opacity).toBe("1");
   });
 
@@ -208,7 +275,7 @@ describe("sticky chrome visibility styles", () => {
 
     expect(transformLayer).not.toBeNull();
     expect(transformLayer?.style.transform).toBe("translate3d(0, -144px, 0)");
-    expect(transformLayer?.style.transition).toBe("none");
+    expect(transformLayer?.style.transitionDelay).toBe("0ms");
     expect(transformLayer?.style.opacity).toBe("1");
     expect(container.querySelector('[data-testid="animated-tabs"]')).not.toBeNull();
     expect(searchInput?.value).toBe("ronaldo");
@@ -227,8 +294,8 @@ describe("sticky chrome visibility styles", () => {
         onTabChange={vi.fn()}
       />,
     );
-    expect(transformLayer?.style.transform).toBe("translate3d(0, -72px, 0)");
-    expect(transformLayer?.style.transition).toBe("none");
+    expect(transformLayer?.style.transform).toBe("translate3d(0, -144px, 0)");
+    expect(transformLayer?.style.transitionDelay).toBe("0ms");
     expect(transformLayer?.style.opacity).toBe("1");
     expect(container.querySelector('[data-testid="animated-tabs"]')).not.toBeNull();
     expect(searchInput?.value).toBe("ronaldo");
@@ -247,8 +314,8 @@ describe("sticky chrome visibility styles", () => {
         onTabChange={vi.fn()}
       />,
     );
-    expect(transformLayer?.style.transform).toBe("translate3d(0, 0px, 0)");
-    expect(transformLayer?.style.transition).toBe("none");
+    expect(transformLayer?.style.transform).toBe("translate3d(0, 0, 0)");
+    expect(transformLayer?.style.transitionDelay).toBe("80ms");
     expect(transformLayer?.style.opacity).toBe("1");
     expect(container.querySelector('[data-testid="animated-tabs"]')).not.toBeNull();
     expect(searchInput?.value).toBe("ronaldo");
@@ -278,8 +345,11 @@ describe("sticky chrome visibility styles", () => {
     );
 
     expect(transformLayer).not.toBeNull();
-    expect(transformLayer?.style.transform).toBe("translate3d(0, 0px, 0)");
-    expect(transformLayer?.style.transition).toBe("none");
+    expect(transformLayer?.style.transform).toBe("translate3d(0, 0, 0)");
+    expect(transformLayer?.style.transitionProperty).toBe("transform");
+    expect(transformLayer?.style.transitionDuration).toBe("280ms");
+    expect(transformLayer?.style.transitionTimingFunction).toBe("cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(transformLayer?.style.transitionDelay).toBe("80ms");
     expect(transformLayer?.style.opacity).toBe("1");
     expect(tabs).not.toBeNull();
     expect(searchInput).not.toBeNull();

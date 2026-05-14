@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, type RefObject } from "react";
+import { useRef, type CSSProperties, type RefObject } from "react";
 import { Plus, Repeat2, Settings, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useElementHeight } from "@/hooks/use-element-height";
+import {
+  SCROLL_CHROME_TRANSITION,
+  useDiscreteChromeHidden,
+} from "@/hooks/use-discrete-chrome-hidden";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
@@ -34,23 +37,38 @@ export function TopBar({
 }) {
   const internalHeaderRef = useRef<HTMLElement | null>(null);
   const headerRef = rootRef ?? internalHeaderRef;
-  const headerHeight = useElementHeight({ ref: headerRef });
   const locale = useStickerStore((state) => state.settings.locale);
   const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
-  const effectiveProgress = isStickyActive ? clampedProgress : 0;
+  const isChromeHidden = useDiscreteChromeHidden({
+    hiddenProgress: clampedProgress,
+    isStickyActive,
+  });
+
+  const headerStyle: CSSProperties = isStickyActive
+    ? {
+        transform: isChromeHidden
+          ? "translate3d(0, -100%, 0)"
+          : "translate3d(0, 0, 0)",
+        opacity: 1,
+        transitionProperty: "transform",
+        transitionDuration: SCROLL_CHROME_TRANSITION.duration,
+        transitionTimingFunction: SCROLL_CHROME_TRANSITION.timingFunction,
+        transitionDelay: isChromeHidden
+          ? SCROLL_CHROME_TRANSITION.staggerDelay
+          : "0ms",
+        willChange: "transform",
+      }
+    : {
+        transform: "none",
+        opacity: 1,
+        transition: "none",
+      };
 
   return (
     <header
       ref={headerRef}
       className="fixed inset-x-0 top-0 z-40 bg-background"
-      style={{
-        transform: isStickyActive
-          ? `translate3d(0, ${-headerHeight * effectiveProgress}px, 0)`
-          : "none",
-        opacity: 1,
-        transition: "none",
-        willChange: isStickyActive ? "transform" : undefined,
-      }}
+      style={headerStyle}
     >
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <button className="inline-flex items-center gap-1 rounded-sm px-0.5 py-2 text-xl font-semibold tracking-normal transition-transform active:scale-[0.99] sm:text-2xl">

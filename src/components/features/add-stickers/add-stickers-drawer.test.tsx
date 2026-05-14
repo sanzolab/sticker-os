@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { AddStickersDrawer } from "./add-stickers-drawer";
 import { useAddStickersPendingStore } from "./add-stickers-session";
 import type { AddStickerCandidate } from "./add-stickers-types";
+import { useAssistantStore } from "@/lib/assistant-store";
 
 vi.mock("@/components/ui/app-drawer", () => ({
   AppDrawer: ({
@@ -26,9 +27,15 @@ vi.mock("@/components/ui/drawer", () => ({
 beforeEach(() => {
   useAddStickersPendingStore.getState().clearPending();
   useAddStickersPendingStore.persist.clearStorage();
+  useAssistantStore.setState({
+    activeMode: "closed",
+    addStickersOpen: false,
+    queuedPhotoCapture: null,
+  });
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   cleanup();
 });
 
@@ -64,6 +71,33 @@ describe("AddStickersDrawer", () => {
 
     expect(useAddStickersPendingStore.getState().candidates).toEqual([]);
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("consumes queued photo capture and analyzes it on open", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [candidate("ARG7", "ARG 7", true)],
+        unresolved: [],
+        provider: "deterministic",
+        source: "image",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    useAssistantStore.setState({
+      queuedPhotoCapture: {
+        id: 1,
+        file: new File(["image"], "capture.jpg", { type: "image/jpeg" }),
+      },
+    });
+
+    render(<AddStickersDrawer open onOpenChange={vi.fn()} />);
+
+    expect(await screen.findByText("Confirm stickers")).toBeTruthy();
+    expect(screen.getByText("ARG 7")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(useAssistantStore.getState().queuedPhotoCapture).toBe(null);
   });
 });
 

@@ -1,11 +1,15 @@
 "use client";
 
 import { Search, SlidersHorizontal } from "lucide-react";
-import { useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { useMemo, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useElementHeight } from "@/hooks/use-element-height";
+import {
+  SCROLL_CHROME_TRANSITION,
+  useDiscreteChromeHidden,
+} from "@/hooks/use-discrete-chrome-hidden";
 import { cn } from "@/lib/utils";
 import { t, type TranslationKey } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
@@ -52,12 +56,55 @@ export function StickyControls({
   const stickyHeight = useElementHeight({ ref: stickyRef });
   const locale = useStickerStore((state) => state.settings.locale);
   const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
-  const effectiveProgress = isStickyActive ? clampedProgress : 0;
   const safeHiddenOffset = Math.max(hiddenOffsetPx ?? stickyHeight, 1);
   const shellHiddenOffset = Math.max(
     (hiddenOffsetPx ?? 0) - Math.max(stickyHeight, 1),
     0,
   );
+  const isChromeHidden = useDiscreteChromeHidden({
+    hiddenProgress: clampedProgress,
+    isStickyActive,
+  });
+  const visibleTransform = "translate3d(0, 0, 0)";
+  const shellTransform = isChromeHidden
+    ? `translate3d(0, ${-shellHiddenOffset}px, 0)`
+    : visibleTransform;
+  const layerTransform = isChromeHidden
+    ? `translate3d(0, ${-safeHiddenOffset}px, 0)`
+    : visibleTransform;
+  const stickyTransitionDelay = isChromeHidden
+    ? "0ms"
+    : SCROLL_CHROME_TRANSITION.staggerDelay;
+
+  const shellStyle: CSSProperties = isStickyActive
+    ? {
+        transform: shellTransform,
+        transitionProperty: "transform",
+        transitionDuration: SCROLL_CHROME_TRANSITION.duration,
+        transitionTimingFunction: SCROLL_CHROME_TRANSITION.timingFunction,
+        transitionDelay: stickyTransitionDelay,
+        willChange: "transform",
+      }
+    : {
+        transform: "none",
+        transition: "none",
+      };
+
+  const layerStyle: CSSProperties = isStickyActive
+    ? {
+        transform: layerTransform,
+        opacity: 1,
+        transitionProperty: "transform",
+        transitionDuration: SCROLL_CHROME_TRANSITION.duration,
+        transitionTimingFunction: SCROLL_CHROME_TRANSITION.timingFunction,
+        transitionDelay: stickyTransitionDelay,
+        willChange: "transform",
+      }
+    : {
+        transform: "none",
+        opacity: 1,
+        transition: "none",
+      };
   const tabs = useMemo(
     () =>
       albumTabs.map((tab) => ({
@@ -88,24 +135,11 @@ export function StickyControls({
               ? "fixed inset-x-0 mx-auto max-w-5xl"
               : "sticky",
           )}
-          style={{
-            transform: isStickyActive
-              ? `translate3d(0, ${-shellHiddenOffset * effectiveProgress}px, 0)`
-              : "none",
-            transition: "none",
-            willChange: isStickyActive ? "transform" : undefined,
-          }}
+          style={shellStyle}
         >
           <div
             className="sticky-controls-transform-layer bg-background px-4 pb-3 sm:px-6 lg:px-8"
-            style={{
-              transform: isStickyActive
-                ? `translate3d(0, ${-safeHiddenOffset * effectiveProgress}px, 0)`
-                : "none",
-              opacity: 1,
-              transition: "none",
-              willChange: isStickyActive ? "transform" : undefined,
-            }}
+            style={layerStyle}
           >
             <AnimatedTabs
               tabs={tabs}

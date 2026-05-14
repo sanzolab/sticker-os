@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AppDrawer } from "@/components/ui/app-drawer";
@@ -8,6 +8,7 @@ import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { analyzeVoiceSubmission } from "@/lib/voice-submit";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
+import { useAssistantStore } from "@/lib/assistant-store";
 import { AddStickersCaptureOptions } from "./add-stickers-capture-options";
 import { AddStickersConfirmFooter } from "./add-stickers-confirm-footer";
 import { AddStickersErrorState } from "./add-stickers-error-state";
@@ -39,6 +40,8 @@ export function AddStickersDrawer({
 
   const locale = useStickerStore((state) => state.settings.locale);
   const tapSticker = useStickerStore((state) => state.tapSticker);
+  const queuedPhotoCapture = useAssistantStore((state) => state.queuedPhotoCapture);
+  const consumeQueuedPhotoCapture = useAssistantStore((state) => state.consumeQueuedPhotoCapture);
   const candidates = useAddStickersPendingStore((state) => state.candidates);
   const unresolved = useAddStickersPendingStore((state) => state.unresolved);
   const source = useAddStickersPendingStore((state) => state.source);
@@ -61,57 +64,7 @@ export function AddStickersDrawer({
     onOpenChange(nextOpen);
   };
 
-  const analyzeText = async (text: string) => {
-    await analyzeRequest(() =>
-      fetch("/api/ai/parse-stickers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "text", text }),
-      }),
-    );
-  };
-
-  const analyzeFile = async (type: "image" | "audio", file: File) => {
-    const formData = new FormData();
-    formData.append("type", type);
-    formData.append("file", file);
-
-    await analyzeRequest(() =>
-      fetch("/api/ai/parse-stickers", {
-        method: "POST",
-        body: formData,
-      }),
-    );
-  };
-
-  const handleVoiceSubmission = async (submission: AddStickersVoiceSubmission) => {
-    setIsLoading(true);
-    const result = await analyzeVoiceSubmission(locale, submission);
-    if (result.ok) {
-      setModeOverride("review");
-    }
-    setIsLoading(false);
-    setError(null);
-    return result;
-  };
-
-  const analyzeRequest = async (request: () => Promise<Response>) => {
-    setIsLoading(true);
-    setError(null);
-
-    const result = await requestAnalysisResult(request);
-
-    if (!result.ok) {
-      setIsLoading(false);
-      setModeOverride("capture");
-      setError(result.error);
-      return;
-    }
-
-    mergeResult(result.result);
-  };
-
-  const requestAnalysisResult = async (
+  const requestAnalysisResult = useCallback(async (
     request: () => Promise<Response>,
   ): Promise<
     | { ok: true; result: AddStickersResult }
@@ -144,9 +97,9 @@ export function AddStickersDrawer({
         },
       };
     }
-  };
+  }, [locale]);
 
-  const mergeResult = (
+  const mergeResult = useCallback((
     nextResult: AddStickersResult,
     nextMode: AddStickersMode = "review",
   ) => {
@@ -154,7 +107,70 @@ export function AddStickersDrawer({
     setIsLoading(false);
     setModeOverride(nextMode === "review" ? "review" : "capture");
     setError(null);
-  };
+  }, [appendResult]);
+
+  const analyzeRequest = useCallback(async (request: () => Promise<Response>) => {
+    setIsLoading(true);
+    setError(null);
+
+    const result = await requestAnalysisResult(request);
+
+    if (!result.ok) {
+      setIsLoading(false);
+      setModeOverride("capture");
+      setError(result.error);
+      return;
+    }
+
+    mergeResult(result.result);
+  }, [mergeResult, requestAnalysisResult]);
+
+  const analyzeText = useCallback(async (text: string) => {
+    await analyzeRequest(() =>
+      fetch("/api/ai/parse-stickers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "text", text }),
+      }),
+    );
+  }, [analyzeRequest]);
+
+  const analyzeFile = useCallback(async (type: "image" | "audio", file: File) => {
+    const formData = new FormData();
+    formData.append("type", type);
+    formData.append("file", file);
+
+    await analyzeRequest(() =>
+      fetch("/api/ai/parse-stickers", {
+        method: "POST",
+        body: formData,
+      }),
+    );
+  }, [analyzeRequest]);
+
+  const handleVoiceSubmission = useCallback(async (submission: AddStickersVoiceSubmission) => {
+    setIsLoading(true);
+    const result = await analyzeVoiceSubmission(locale, submission);
+    if (result.ok) {
+      setModeOverride("review");
+    }
+    setIsLoading(false);
+    setError(null);
+    return result;
+  }, [locale]);
+
+  useEffect(() => {
+    if (!open || !queuedPhotoCapture) return;
+
+    const timer = window.setTimeout(() => {
+      consumeQueuedPhotoCapture();
+      void analyzeFile("image", queuedPhotoCapture.file);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [analyzeFile, consumeQueuedPhotoCapture, open, queuedPhotoCapture]);
 
   const confirmAdd = () => {
     confirmAndConsume()
