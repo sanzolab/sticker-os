@@ -3,13 +3,13 @@ viewBox="0 0 180 180">
 
   <style>
     :root {
-      --primary-fill: #fff;
-      --secondary-fill: #000;
+      --primary-fill: #000;
+      --secondary-fill: #fff;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --primary-fill: #000;
-        --secondary-fill: #fff;
+        --primary-fill: #fff
+        --secondary-fill: #000;
       }
     }
   </style>
