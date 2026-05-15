@@ -19,11 +19,24 @@ const audioMimeTypes = new Set([
 ]);
 
 export async function POST(request: Request) {
+  const timerPrefix = `ai-request:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const totalLabel = `${timerPrefix}:total`;
+  const readLabel = `${timerPrefix}:request-read`;
+  let readEnded = false;
+  console.time(totalLabel);
+
   try {
+    console.time(readLabel);
     const input = await readParseInput(request);
+    console.timeEnd(readLabel);
+    readEnded = true;
     const result = await parseStickersFromInput(input);
     return NextResponse.json(result);
   } catch (error) {
+    if (!readEnded) {
+      console.timeEnd(readLabel);
+      readEnded = true;
+    }
     if (error instanceof AiParseError) {
       return NextResponse.json(
         {
@@ -43,6 +56,8 @@ export async function POST(request: Request) {
       },
       { status: 500 },
     );
+  } finally {
+    console.timeEnd(totalLabel);
   }
 }
 

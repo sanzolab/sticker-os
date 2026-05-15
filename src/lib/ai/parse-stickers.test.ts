@@ -1,9 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
 import {
   parseStickersFromInput,
   parseTextDeterministically,
 } from "@/lib/ai/parse-stickers";
 import { parseVoiceTranscriptDeterministically } from "@/lib/ai/deterministic";
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("deterministic sticker parsing", () => {
   it.each([
@@ -326,11 +332,14 @@ describe("deterministic sticker parsing", () => {
       { providerParser },
     );
 
-    expect(providerParser).toHaveBeenCalledWith({
-      type: "text",
-      source: "voice-transcript",
-      text: "sticker 14",
-    });
+    expect(providerParser).toHaveBeenCalledWith(
+      {
+        type: "text",
+        source: "voice-transcript",
+        text: "sticker 14",
+      },
+      expect.objectContaining({ signal: expect.any(Object) }),
+    );
     expect(result.provider).toBe("gemini");
     expect(result.candidates.map((candidate) => candidate.code)).toEqual([
       "MEX 13",
@@ -402,7 +411,472 @@ describe("deterministic sticker parsing", () => {
     expect(result.candidates[0]?.code).toBe("MEX 13");
     expect(result.unresolved).toEqual([
       { rawText: "sticker 14", reason: "Missing group/team" },
+      {
+        rawText: "Invented",
+        reason: "Weak visual signal without readable sticker code/text.",
+      },
     ]);
+  });
+
+  it("downgrades medium evidence when image coverage is suspiciously high", async () => {
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: Array.from({ length: 12 }, (_, index) => {
+          const number = `${index + 1}`;
+          return {
+            rawText: `Coca Cola sticker ${number}`,
+            group: "CC",
+            number,
+            confidence: 0.95,
+          };
+        }),
+        unresolved: [],
+      },
+    });
+
+    const result = await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(result.candidates).toHaveLength(12);
+    expect(result.candidates.some((candidate) => candidate.confidence <= 0.55)).toBe(true);
+  });
+
+  it("keeps strong printed-code evidence while downgrading medium evidence on suspicious grids", async () => {
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: Array.from({ length: 12 }, (_, index) => {
+          const number = `${index + 1}`;
+          return {
+            rawText: number === "5" ? "CC 5" : `Coca Cola sticker ${number}`,
+            group: "CC",
+            number,
+            confidence: 0.95,
+          };
+        }),
+        unresolved: [],
+      },
+    });
+
+    const result = await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    const strong = result.candidates.find((candidate) => candidate.code === "CC 5");
+    expect(strong).toBeDefined();
+    expect(strong!.confidence).toBe(0.95);
+
+    const downgraded = result.candidates
+      .filter((candidate) => candidate.code !== "CC 5")
+      .map((candidate) => candidate.confidence);
+    expect(downgraded.length).toBe(11);
+    expect(downgraded.every((confidence) => confidence <= 0.55)).toBe(true);
+  });
+
+  it("treats sparse group coverage below fifty percent as likely real", async () => {
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: ["3", "7", "12", "18"].map((number) => ({
+          rawText: `Mexico sticker ${number}`,
+          group: "MEX",
+          number,
+          confidence: 0.9,
+        })),
+        unresolved: [],
+      },
+    });
+
+    const result = await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(result.candidates.map((candidate) => candidate.code)).toEqual([
+      "MEX 3",
+      "MEX 7",
+      "MEX 12",
+      "MEX 18",
+    ]);
+    expect(result.candidates.every((candidate) => candidate.confidence > 0.55)).toBe(true);
+  });
+
+  it("moves artwork-only detections to unresolved for image input", async () => {
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: [
+          {
+            rawText: "player portrait",
+            group: "MEX",
+            number: "5",
+            confidence: 0.9,
+            visualEvidence: "artwork",
+          },
+          {
+            rawText: "MEX 13",
+            code: "MEX 13",
+            confidence: 0.9,
+          },
+        ],
+        unresolved: [],
+      },
+    });
+
+    const result = await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.code).toBe("MEX 13");
+    expect(result.unresolved).toEqual([
+      {
+        rawText: "player portrait",
+        reason: "Weak visual signal without readable sticker code/text.",
+      },
+    ]);
+  });
+
+  it("ignores blank placeholder slot outputs for image input", async () => {
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: [
+          {
+            rawText: "blank placeholder slot",
+            group: "MEX",
+            number: "8",
+            confidence: 0.99,
+            visualEvidence: "empty",
+          },
+          {
+            rawText: "MEX 8",
+            code: "MEX 8",
+            confidence: 0.9,
+          },
+        ],
+        unresolved: [],
+      },
+    });
+
+    const result = await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.code).toBe("MEX 8");
+    expect(result.unresolved).toEqual([]);
+  });
+
+  it("returns distinguishable empty metadata when image slots are all placeholders", async () => {
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: [
+          {
+            rawText: "blank placeholder slot",
+            group: "MEX",
+            number: "8",
+            confidence: 0.99,
+            visualEvidence: "empty",
+          },
+        ],
+        unresolved: [],
+      },
+    });
+
+    const result = await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(result.candidates).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+    expect(result.meta).toEqual({ status: "empty" });
+  });
+
+  it("times out provider calls instead of leaving image parsing pending", async () => {
+    vi.useFakeTimers();
+    const providerParser = vi.fn(
+      () =>
+        new Promise<never>(() => {
+          // Simulates a provider fetch that never settles.
+        }),
+    );
+
+    const resultPromise = parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    const assertion = expect(resultPromise).rejects.toMatchObject({
+      code: "AI_TIMEOUT_ERROR",
+      status: 504,
+    });
+    await vi.advanceTimersByTimeAsync(15000);
+    await assertion;
+    expect(providerParser).toHaveBeenCalledTimes(1);
+  });
+
+  it("resizes and recompresses image uploads before model parsing", async () => {
+    const largePng = await sharp({
+      create: {
+        width: 2400,
+        height: 1600,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    }).png().toBuffer();
+    const providerParser = vi.fn().mockImplementation(async (input) => {
+      if (input.type !== "image") {
+        throw new Error("Expected image input.");
+      }
+
+      const metadata = await sharp(Buffer.from(input.file.data)).metadata();
+      expect(metadata.width).toBeLessThanOrEqual(1600);
+      expect(metadata.format).toBe("jpeg");
+      expect(input.file.mimeType).toBe("image/jpeg");
+
+      return {
+        provider: "gemini",
+        model: "configured-model",
+        result: {
+          stickers: [],
+          unresolved: [],
+        },
+      };
+    });
+
+    await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: (() => {
+            const arrayBuffer = new ArrayBuffer(largePng.byteLength);
+            new Uint8Array(arrayBuffer).set(largePng);
+            return arrayBuffer;
+          })(),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(providerParser).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses OpenAI fallback after a fast non-timeout Gemini failure", async () => {
+    const originalDefaults = {
+      AI_DEFAULT_PROVIDER: process.env.AI_DEFAULT_PROVIDER,
+      AI_ENABLE_FALLBACKS: process.env.AI_ENABLE_FALLBACKS,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      OPENAI_MODEL: process.env.OPENAI_MODEL,
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GEMINI_MODEL: process.env.GEMINI_MODEL,
+    };
+
+    try {
+      process.env.AI_DEFAULT_PROVIDER = "gemini";
+      process.env.AI_ENABLE_FALLBACKS = "true";
+      process.env.GEMINI_API_KEY = "gemini-key";
+      process.env.GEMINI_MODEL = "gemini-model";
+      process.env.OPENAI_API_KEY = "openai-key";
+      process.env.OPENAI_MODEL = "openai-model";
+
+      vi.resetModules();
+      const parseGemini = vi.fn().mockRejectedValue(
+        new Error("upstream fast failure"),
+      );
+      const parseOpenAi = vi.fn().mockResolvedValue({
+        provider: "openai",
+        model: "openai-model",
+        result: {
+          stickers: [],
+          unresolved: [],
+        },
+      });
+
+      vi.doMock("@/lib/ai/providers/gemini", () => ({
+        parseStickersWithGemini: parseGemini,
+      }));
+      vi.doMock("@/lib/ai/providers/openai", () => ({
+        parseStickersWithOpenAi: parseOpenAi,
+      }));
+
+      const { parseStickersFromInput: parseWithFallback } = await import("@/lib/ai/parse-stickers");
+
+      const result = await parseWithFallback({
+        type: "audio",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "audio/webm",
+        },
+      });
+
+      expect(parseGemini).toHaveBeenCalledTimes(1);
+      expect(parseOpenAi).toHaveBeenCalledTimes(1);
+      expect(result.provider).toBe("openai");
+    } finally {
+      vi.doUnmock("@/lib/ai/providers/gemini");
+      vi.doUnmock("@/lib/ai/providers/openai");
+      process.env.AI_DEFAULT_PROVIDER = originalDefaults.AI_DEFAULT_PROVIDER;
+      process.env.AI_ENABLE_FALLBACKS = originalDefaults.AI_ENABLE_FALLBACKS;
+      process.env.OPENAI_API_KEY = originalDefaults.OPENAI_API_KEY;
+      process.env.OPENAI_MODEL = originalDefaults.OPENAI_MODEL;
+      process.env.GEMINI_API_KEY = originalDefaults.GEMINI_API_KEY;
+      process.env.GEMINI_MODEL = originalDefaults.GEMINI_MODEL;
+    }
+  });
+
+  it("does not fallback after a slow Gemini failure", async () => {
+    const originalDefaults = {
+      AI_DEFAULT_PROVIDER: process.env.AI_DEFAULT_PROVIDER,
+      AI_ENABLE_FALLBACKS: process.env.AI_ENABLE_FALLBACKS,
+      AI_FAST_FAIL_FALLBACK_MS: process.env.AI_FAST_FAIL_FALLBACK_MS,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      OPENAI_MODEL: process.env.OPENAI_MODEL,
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GEMINI_MODEL: process.env.GEMINI_MODEL,
+    };
+
+    try {
+      process.env.AI_DEFAULT_PROVIDER = "gemini";
+      process.env.AI_ENABLE_FALLBACKS = "true";
+      process.env.AI_FAST_FAIL_FALLBACK_MS = "3000";
+      process.env.GEMINI_API_KEY = "gemini-key";
+      process.env.GEMINI_MODEL = "gemini-model";
+      process.env.OPENAI_API_KEY = "openai-key";
+      process.env.OPENAI_MODEL = "openai-model";
+
+      vi.useFakeTimers();
+      vi.resetModules();
+      const parseGemini = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 3100));
+        throw new Error("slow failure");
+      });
+      const parseOpenAi = vi.fn();
+
+      vi.doMock("@/lib/ai/providers/gemini", () => ({
+        parseStickersWithGemini: parseGemini,
+      }));
+      vi.doMock("@/lib/ai/providers/openai", () => ({
+        parseStickersWithOpenAi: parseOpenAi,
+      }));
+
+      const { parseStickersFromInput: parseWithFallback } = await import("@/lib/ai/parse-stickers");
+      const promise = parseWithFallback({
+        type: "audio",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "audio/webm",
+        },
+      });
+      const assertion = expect(promise).rejects.toThrow("slow failure");
+      await vi.advanceTimersByTimeAsync(4000);
+      await assertion;
+      expect(parseGemini).toHaveBeenCalledTimes(1);
+      expect(parseOpenAi).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock("@/lib/ai/providers/gemini");
+      vi.doUnmock("@/lib/ai/providers/openai");
+      process.env.AI_DEFAULT_PROVIDER = originalDefaults.AI_DEFAULT_PROVIDER;
+      process.env.AI_ENABLE_FALLBACKS = originalDefaults.AI_ENABLE_FALLBACKS;
+      process.env.AI_FAST_FAIL_FALLBACK_MS = originalDefaults.AI_FAST_FAIL_FALLBACK_MS;
+      process.env.OPENAI_API_KEY = originalDefaults.OPENAI_API_KEY;
+      process.env.OPENAI_MODEL = originalDefaults.OPENAI_MODEL;
+      process.env.GEMINI_API_KEY = originalDefaults.GEMINI_API_KEY;
+      process.env.GEMINI_MODEL = originalDefaults.GEMINI_MODEL;
+    }
+  });
+
+  it("logs normalization failures and returns error metadata for image input", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: [],
+        unresolved: undefined,
+      },
+    });
+
+    const result = await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: new ArrayBuffer(0),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(consoleError).toHaveBeenCalledWith(
+      "normalizeModelResult failed",
+      expect.any(TypeError),
+    );
+    expect(result.candidates).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+    expect(result.meta).toEqual({
+      status: "error",
+      errorCode: "AI_PROVIDER_ERROR",
+    });
   });
 });
 

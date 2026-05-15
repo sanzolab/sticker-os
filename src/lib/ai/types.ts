@@ -12,7 +12,8 @@ export type AiErrorCode =
   | "AI_PROVIDER_NOT_CONFIGURED"
   | "AI_PROVIDER_ERROR"
   | "AI_INVALID_MODEL_RESPONSE"
-  | "AI_NO_STICKERS_FOUND";
+  | "AI_NO_STICKERS_FOUND"
+  | "AI_TIMEOUT_ERROR";
 
 export type ParseStickersInput =
   | {
@@ -38,6 +39,7 @@ export type ModelStickerSuggestion = {
   group?: string;
   number?: string;
   confidence?: number;
+  visualEvidence?: string;
 };
 
 export type ModelUnresolvedSuggestion = {
@@ -73,6 +75,21 @@ export type ParseStickersResult = {
   provider: AiProviderName;
   model?: string;
   source: AiInputType;
+  meta?: {
+    status?: "success" | "empty" | "timeout" | "error";
+    timeout?: boolean;
+    errorCode?: string;
+  };
+  pageType?: "team" | "cc" | "fwc" | null;
+  presentes?: { group: string; number: string }[];
+  faltantes?: { group: string; number: string }[];
+  uncertain?: { group: string | null; number: string | null; reason?: string }[];
+  status?: "ok" | "needs_review";
+  methodology?: "missing_only_complement";
+  country?: string | null;
+  group?: string | null;
+  warnings?: string[];
+  rawModelResult?: Record<string, unknown>;
 };
 
 export type ResolvedStickerCandidate = {

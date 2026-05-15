@@ -21,6 +21,12 @@ import { useAddStickersPendingStore } from "./add-stickers-session";
 import { AddStickersConfirmFooter } from "./add-stickers-confirm-footer";
 import { AddStickersLoadingState } from "./add-stickers-loading-state";
 import { AddStickersReviewList } from "./add-stickers-review-list";
+import {
+  fetchWithAddStickersTimeout,
+  isAddStickersTimeoutError,
+  isEmptyAnalysisResult,
+  isFailedAnalysisResult,
+} from "./add-stickers-request";
 import type { AddStickersError, AddStickersResult } from "./add-stickers-types";
 
 type PhotoCaptureMode = "capture" | "loading" | "review";
@@ -36,6 +42,7 @@ export function PhotoCapturePanel() {
   const locale = useStickerStore((state) => state.settings.locale);
   const candidates = useAddStickersPendingStore((state) => state.candidates);
   const unresolved = useAddStickersPendingStore((state) => state.unresolved);
+  const albumAnalyses = useAddStickersPendingStore((state) => state.albumAnalyses);
   const source = useAddStickersPendingStore((state) => state.source);
   const appendResult = useAddStickersPendingStore((state) => state.appendResult);
   const toggleCandidate = useAddStickersPendingStore((state) => state.toggleCandidate);
@@ -97,13 +104,29 @@ export function PhotoCapturePanel() {
           },
         };
       }
-      return { ok: true, result: body as AddStickersResult };
-    } catch {
+      const parsedResult = body as AddStickersResult;
+      if (isFailedAnalysisResult(parsedResult)) {
+        const isTimeout = parsedResult.meta?.timeout === true ||
+          parsedResult.meta?.status === "timeout";
+        return {
+          ok: false,
+          error: {
+            code: parsedResult.meta?.errorCode ?? (isTimeout ? "AI_TIMEOUT_ERROR" : "AI_PROVIDER_ERROR"),
+            message: isTimeout
+              ? t(locale, "addStickers.error.timeout")
+              : t(locale, "addStickers.error.generic"),
+          },
+        };
+      }
+      return { ok: true, result: parsedResult };
+    } catch (error) {
       return {
         ok: false,
         error: {
-          code: "AI_PROVIDER_ERROR",
-          message: t(locale, "addStickers.voice.connectionError"),
+          code: isAddStickersTimeoutError(error) ? "AI_TIMEOUT_ERROR" : "AI_PROVIDER_ERROR",
+          message: isAddStickersTimeoutError(error)
+            ? t(locale, "addStickers.error.timeout")
+            : t(locale, "addStickers.voice.connectionError"),
         },
       };
     }
@@ -117,34 +140,36 @@ export function PhotoCapturePanel() {
     formData.append("type", "image");
     formData.append("file", file);
 
-    const result = await requestAnalysisResult(() =>
-      fetch("/api/ai/parse-stickers", {
-        method: "POST",
-        body: formData,
-      }),
-    );
+    try {
+      const result = await requestAnalysisResult(() =>
+        fetchWithAddStickersTimeout("/api/ai/parse-stickers", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
-    if (!result.ok) {
-      setMode("capture");
-      setCaptureFeedback({
-        title: t(locale, "addStickers.error.title"),
-        message: result.error.message,
-      });
-      return;
+      if (!result.ok) {
+        setCaptureFeedback({
+          title: t(locale, "addStickers.error.title"),
+          message: result.error.message,
+        });
+        return;
+      }
+
+      if (isEmptyAnalysisResult(result.result)) {
+        setCaptureFeedback({
+          title: t(locale, "addStickers.empty.title"),
+          message: t(locale, "addStickers.empty.description"),
+        });
+        return;
+      }
+
+      appendResult(result.result);
+      setMode("review");
+      setCaptureFeedback(null);
+    } finally {
+      setMode((currentMode) => currentMode === "loading" ? "capture" : currentMode);
     }
-
-    if (result.result.candidates.length === 0) {
-      setMode("capture");
-      setCaptureFeedback({
-        title: t(locale, "addStickers.empty.title"),
-        message: t(locale, "addStickers.empty.description"),
-      });
-      return;
-    }
-
-    appendResult(result.result);
-    setMode("review");
-    setCaptureFeedback(null);
   }, [appendResult, locale, requestAnalysisResult]);
 
   const handleCapture = useCallback((file: File) => {
@@ -260,7 +285,7 @@ export function PhotoCapturePanel() {
             event.stopPropagation();
           }}
         >
-          <div className="safe-bottom safe-top flex min-h-full flex-col">
+          <div className="safe-bottom safe-top flex min-h-full flex-col justify-between">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1 p-5">
                 <h2 id="photo-capture-panel-title" className="text-lg font-semibold">
@@ -272,7 +297,7 @@ export function PhotoCapturePanel() {
               </div>
               <button
                 type="button"
-                className="mr-5 mt-5 inline-flex size-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="mr-5 mt-5 inline-flex size-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aspect-square"
                 onClick={closePanel}
                 aria-label={t(locale, "addStickers.photoPanel.close")}
               >
@@ -283,7 +308,7 @@ export function PhotoCapturePanel() {
             {mode === "loading" && <AddStickersLoadingState />}
 
             {mode === "capture" && (
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5">
+              <div className="min-h-0  space-y-5 overflow-y-auto px-5 pb-5">
                 <button
                   type="button"
                   className={`group flex w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${
@@ -386,6 +411,7 @@ export function PhotoCapturePanel() {
                   <AddStickersReviewList
                     candidates={candidates}
                     unresolved={unresolved}
+                    albumAnalyses={albumAnalyses}
                     selectedIds={selectedIds}
                     onToggle={toggleCandidate}
                   />

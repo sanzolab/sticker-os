@@ -186,6 +186,31 @@ describe("useAddStickersPendingStore", () => {
       model: undefined,
     });
   });
+
+  it("stores missing-only album analyses alongside candidates", () => {
+    const store = useAddStickersPendingStore.getState();
+
+    store.appendResult({
+      candidates: [],
+      unresolved: [],
+      provider: "gemini",
+      source: "image",
+      status: "needs_review",
+      methodology: "missing_only_complement",
+      pageType: "team",
+      country: "Mexico",
+      group: "MEX",
+      presentes: [],
+      faltantes: [{ group: "MEX", number: "7" }],
+      uncertain: [{ group: "MEX", number: null, reason: "blurred" }],
+      warnings: ["test-warning"],
+      rawModelResult: { pageType: "team" },
+    });
+
+    const pending = useAddStickersPendingStore.getState();
+    expect(pending.albumAnalyses).toHaveLength(1);
+    expect(pending.albumAnalyses[0]?.methodology).toBe("missing_only_complement");
+  });
 });
 
 describe("hasPendingItems", () => {
@@ -197,6 +222,18 @@ describe("hasPendingItems", () => {
         unresolved: [{ rawText: "unknown", reason: "reason" }],
       }),
     ).toBe(true);
+    expect(hasPendingItems({ candidates: [], unresolved: [], albumAnalyses: [{ 
+      status: "needs_review",
+      methodology: "missing_only_complement",
+      pageType: "team",
+      country: "Mexico",
+      group: "MEX",
+      presentes: [],
+      faltantes: [],
+      uncertain: [],
+      warnings: [],
+      rawModelResult: {},
+    }] })).toBe(true);
     expect(hasPendingItems({ candidates: [], unresolved: [] })).toBe(false);
   });
 });

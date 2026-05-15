@@ -15,6 +15,11 @@ import { AddStickersErrorState } from "./add-stickers-error-state";
 import { AddStickersLoadingState } from "./add-stickers-loading-state";
 import { AddStickersReviewList } from "./add-stickers-review-list";
 import {
+  fetchWithAddStickersTimeout,
+  isAddStickersTimeoutError,
+  isFailedAnalysisResult,
+} from "./add-stickers-request";
+import {
   hasPendingItems,
   useAddStickersPendingStore,
 } from "./add-stickers-session";
@@ -44,12 +49,13 @@ export function AddStickersDrawer({
   const consumeQueuedPhotoCapture = useAssistantStore((state) => state.consumeQueuedPhotoCapture);
   const candidates = useAddStickersPendingStore((state) => state.candidates);
   const unresolved = useAddStickersPendingStore((state) => state.unresolved);
+  const albumAnalyses = useAddStickersPendingStore((state) => state.albumAnalyses);
   const source = useAddStickersPendingStore((state) => state.source);
   const appendResult = useAddStickersPendingStore((state) => state.appendResult);
   const toggleCandidate = useAddStickersPendingStore((state) => state.toggleCandidate);
   const clearPending = useAddStickersPendingStore((state) => state.clearPending);
   const confirmAndConsume = useAddStickersPendingStore((state) => state.confirmAndConsume);
-  const hasPending = hasPendingItems({ candidates, unresolved });
+  const hasPending = hasPendingItems({ candidates, unresolved, albumAnalyses });
   const pendingCount = candidates.length;
   const mode: AddStickersMode = isLoading
     ? "loading"
@@ -84,16 +90,33 @@ export function AddStickersDrawer({
         };
       }
 
+      const parsedResult = body as AddStickersResult;
+      if (isFailedAnalysisResult(parsedResult)) {
+        const isTimeout = parsedResult.meta?.timeout === true ||
+          parsedResult.meta?.status === "timeout";
+        return {
+          ok: false,
+          error: {
+            code: parsedResult.meta?.errorCode ?? (isTimeout ? "AI_TIMEOUT_ERROR" : "AI_PROVIDER_ERROR"),
+            message: isTimeout
+              ? t(locale, "addStickers.error.timeout")
+              : t(locale, "addStickers.error.generic"),
+          },
+        };
+      }
+
       return {
         ok: true,
-        result: body as AddStickersResult,
+        result: parsedResult,
       };
-    } catch {
+    } catch (error) {
       return {
         ok: false,
         error: {
-          code: "AI_PROVIDER_ERROR",
-          message: t(locale, "addStickers.voice.connectionError"),
+          code: isAddStickersTimeoutError(error) ? "AI_TIMEOUT_ERROR" : "AI_PROVIDER_ERROR",
+          message: isAddStickersTimeoutError(error)
+            ? t(locale, "addStickers.error.timeout")
+            : t(locale, "addStickers.voice.connectionError"),
         },
       };
     }
@@ -113,21 +136,24 @@ export function AddStickersDrawer({
     setIsLoading(true);
     setError(null);
 
-    const result = await requestAnalysisResult(request);
+    try {
+      const result = await requestAnalysisResult(request);
 
-    if (!result.ok) {
+      if (!result.ok) {
+        setModeOverride("capture");
+        setError(result.error);
+        return;
+      }
+
+      mergeResult(result.result);
+    } finally {
       setIsLoading(false);
-      setModeOverride("capture");
-      setError(result.error);
-      return;
     }
-
-    mergeResult(result.result);
   }, [mergeResult, requestAnalysisResult]);
 
   const analyzeText = useCallback(async (text: string) => {
     await analyzeRequest(() =>
-      fetch("/api/ai/parse-stickers", {
+      fetchWithAddStickersTimeout("/api/ai/parse-stickers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "text", text }),
@@ -141,7 +167,7 @@ export function AddStickersDrawer({
     formData.append("file", file);
 
     await analyzeRequest(() =>
-      fetch("/api/ai/parse-stickers", {
+      fetchWithAddStickersTimeout("/api/ai/parse-stickers", {
         method: "POST",
         body: formData,
       }),
@@ -259,6 +285,7 @@ export function AddStickersDrawer({
               <AddStickersReviewList
                 candidates={candidates}
                 unresolved={unresolved}
+                albumAnalyses={albumAnalyses}
                 selectedIds={selectedIds}
                 onToggle={toggleCandidate}
               />

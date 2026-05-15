@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -35,6 +35,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   cleanup();
 });
@@ -98,6 +99,35 @@ describe("AddStickersDrawer", () => {
     expect(screen.getByText("ARG 7")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(useAssistantStore.getState().queuedPhotoCapture).toBe(null);
+  });
+
+  it("times out a stuck queued photo request and returns to capture mode", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    useAssistantStore.setState({
+      queuedPhotoCapture: {
+        id: 1,
+        file: new File(["image"], "capture.jpg", { type: "image/jpeg" }),
+      },
+    });
+
+    render(<AddStickersDrawer open onOpenChange={vi.fn()} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20000);
+    });
+
+    expect(screen.getByText("Could not analyze stickers")).toBeTruthy();
+    expect(screen.getByText("Analysis took too long. Try again with a clearer photo.")).toBeTruthy();
+    expect(screen.queryByText("Analyzing stickers")).toBeNull();
   });
 });
 

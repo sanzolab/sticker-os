@@ -201,6 +201,12 @@ const translations = {
     "addStickers.review.description":
       "Tap any sticker to choose whether it will be added.",
     "addStickers.review.source": "From: {source}",
+    "addStickers.review.album.missing": "Faltantes detectadas por IA",
+    "addStickers.review.album.present": "Presentes inferidas por diferencia",
+    "addStickers.review.album.method": "Método: faltantes detectadas + complemento 1..20",
+    "addStickers.review.album.uncertain": "Ranuras vacías inciertas",
+    "addStickers.review.album.needsReview":
+      "No se infirieron presentes porque la página no fue segura para procesar.",
     "addStickers.pending.review": "Review pending ({count})",
     "addStickers.pending.reviewShort": "Review pending",
     "addStickers.pending.discard": "Discard pending",
@@ -217,6 +223,8 @@ const translations = {
     "addStickers.error.title": "Could not analyze stickers",
     "addStickers.error.generic":
       "Something went wrong while analyzing those stickers.",
+    "addStickers.error.timeout":
+      "Analysis took too long. Try again with a clearer photo.",
     "addStickers.back": "Back",
     "addStickers.analyzeAnother": "Analyze another",
     "addStickers.confirm": "Confirm add selected stickers ({count})",
@@ -437,6 +445,12 @@ const translations = {
     "addStickers.review.description":
       "Toca cualquier figurita para elegir si se agregará.",
     "addStickers.review.source": "De: {source}",
+    "addStickers.review.album.missing": "Faltantes detectadas por IA",
+    "addStickers.review.album.present": "Presentes inferidas por diferencia",
+    "addStickers.review.album.method": "Método: faltantes detectadas + complemento 1..20",
+    "addStickers.review.album.uncertain": "Ranuras vacías inciertas",
+    "addStickers.review.album.needsReview":
+      "No se infirieron presentes porque la página no fue segura para procesar.",
     "addStickers.pending.review": "Revisar pendientes ({count})",
     "addStickers.pending.reviewShort": "Ver pendientes",
     "addStickers.pending.discard": "Descartar pendientes",
@@ -453,6 +467,8 @@ const translations = {
     "addStickers.error.title": "No se pudieron analizar las figuritas",
     "addStickers.error.generic":
       "Algo salió mal al analizar esas figuritas.",
+    "addStickers.error.timeout":
+      "El análisis tardó demasiado. Intenta de nuevo con una foto más clara.",
     "addStickers.back": "Volver",
     "addStickers.analyzeAnother": "Analizar otra",
     "addStickers.confirm": "Confirmar figuritas seleccionadas ({count})",

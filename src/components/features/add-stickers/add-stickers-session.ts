@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type {
+  AddStickersAlbumAnalysis,
   AddStickerCandidate,
   AddStickerUnresolved,
   AddStickersResult,
@@ -15,6 +16,7 @@ type PendingSource = {
 export type AddStickersPendingState = {
   candidates: AddStickerCandidate[];
   unresolved: AddStickerUnresolved[];
+  albumAnalyses: AddStickersAlbumAnalysis[];
   source: PendingSource;
   lastUpdatedAt: number | null;
   hasHydrated: boolean;
@@ -35,6 +37,7 @@ const defaultPendingSource: PendingSource = {
 const defaultState = {
   candidates: [],
   unresolved: [],
+  albumAnalyses: [],
   source: defaultPendingSource,
   lastUpdatedAt: null,
 };
@@ -53,6 +56,7 @@ export const useAddStickersPendingStore = create<AddStickersPendingState>()(
           return {
             ...state,
             ...merged,
+            albumAnalyses: mergeAlbumAnalyses(state.albumAnalyses, incoming),
             source: mergePendingSource(state.source, incoming),
             lastUpdatedAt: Date.now(),
           };
@@ -82,14 +86,22 @@ export const useAddStickersPendingStore = create<AddStickersPendingState>()(
     }),
     {
       name: PENDING_STORAGE_KEY,
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => {
         if (typeof window === "undefined") return inMemoryStorage;
         return window.localStorage;
       }),
+      migrate: (persistedState) => {
+        const state = (persistedState ?? {}) as Partial<AddStickersPendingState>;
+        return {
+          ...state,
+          albumAnalyses: Array.isArray(state.albumAnalyses) ? state.albumAnalyses : [],
+        };
+      },
       partialize: (state) => ({
         candidates: state.candidates,
         unresolved: state.unresolved,
+        albumAnalyses: state.albumAnalyses,
         source: state.source,
         lastUpdatedAt: state.lastUpdatedAt,
       }),
@@ -103,11 +115,15 @@ export const useAddStickersPendingStore = create<AddStickersPendingState>()(
 export function hasPendingItems({
   candidates,
   unresolved,
+  albumAnalyses,
 }: {
   candidates: AddStickerCandidate[];
   unresolved: AddStickerUnresolved[];
+  albumAnalyses?: AddStickersAlbumAnalysis[];
 }) {
-  return candidates.length > 0 || unresolved.length > 0;
+  return candidates.length > 0 ||
+    unresolved.length > 0 ||
+    (albumAnalyses?.length ?? 0) > 0;
 }
 
 function mergePendingSource(
@@ -216,4 +232,30 @@ function normalizeUnresolvedText(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function mergeAlbumAnalyses(
+  existing: AddStickersAlbumAnalysis[],
+  incoming: AddStickersResult,
+) {
+  const parsed = readAlbumAnalysisFromResult(incoming);
+  if (!parsed) return existing;
+  return [...existing, parsed];
+}
+
+function readAlbumAnalysisFromResult(result: AddStickersResult) {
+  if (result.methodology !== "missing_only_complement") return null;
+
+  return {
+    status: result.status ?? "needs_review",
+    methodology: result.methodology,
+    pageType: result.pageType ?? null,
+    country: result.country ?? null,
+    group: result.group ?? null,
+    presentes: result.presentes ?? [],
+    faltantes: result.faltantes ?? [],
+    uncertain: result.uncertain ?? [],
+    warnings: result.warnings ?? [],
+    rawModelResult: result.rawModelResult ?? {},
+  } satisfies AddStickersAlbumAnalysis;
 }
