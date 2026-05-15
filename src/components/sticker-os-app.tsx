@@ -11,6 +11,8 @@ import { StatsDrawer } from "@/components/stats-drawer";
 import { StickyControls, albumTabs, type AlbumTab } from "@/components/sticky-controls";
 import { TopBar, type ShareState } from "@/components/top-bar";
 import { TradeDrawer } from "@/components/trade-drawer";
+import { resolveTabScrollTarget } from "@/components/tab-scroll-restoration";
+import { useIsomorphicLayoutEffect } from "@/components/use-isomorphic-layout-effect";
 import { useElementHeight } from "@/hooks/use-element-height";
 import { useAssistantStore } from "@/lib/assistant-store";
 import { usePageScrollVisibility, useRegisterStickyActivation } from "@/lib/scroll-visibility";
@@ -19,6 +21,8 @@ import { useAddStickersPendingStore } from "@/components/features/add-stickers/a
 import type { Sticker } from "@/lib/sticker-data";
 
 type SortMode = "grouped" | "az";
+const STICKY_TOP_PX = 56;
+const STICKY_SAFETY_BUFFER_PX = 8;
 
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -33,6 +37,9 @@ export function StickerOSApp() {
   const stickyActivationSentinelRef = useRef<HTMLDivElement | null>(null);
   const stickyControlsRef = useRef<HTMLElement | null>(null);
   const topBarRef = useRef<HTMLElement | null>(null);
+  const tabContentSectionRef = useRef<HTMLElement | null>(null);
+  const tabScrollYByTabRef = useRef<Partial<Record<AlbumTab, number>>>({});
+  const pendingTabRestoreRef = useRef<AlbumTab | null>(null);
   const stickyHeight = useElementHeight({ ref: stickyControlsRef });
   const topBarHeight = useElementHeight({ ref: topBarRef });
 
@@ -83,30 +90,97 @@ export function StickerOSApp() {
     setSortMode((mode) => (mode === "grouped" ? "az" : "grouped"));
   }, []);
 
-  const handleTabChange = useCallback((tab: AlbumTab) => {
+  const switchTab = useCallback((tab: AlbumTab) => {
     if (tab === activeTab) return;
+    if (typeof window !== "undefined") {
+      tabScrollYByTabRef.current[activeTab] = window.scrollY;
+    }
+    pendingTabRestoreRef.current = tab;
     setActiveTab(tab);
   }, [activeTab]);
 
   const activeTabIndex = albumTabs.findIndex((item) => item.id === activeTab);
   const safeTabsHeight = Math.max(stickyHeight || 0, 1);
   const safeTopBarHeight = Math.max(topBarHeight || 0, 1);
-  const tabsHiddenOffsetPx = safeTabsHeight + Math.max(56, safeTopBarHeight) + 8;
+  const tabsHiddenOffsetPx =
+    safeTabsHeight + Math.max(STICKY_TOP_PX, safeTopBarHeight) + STICKY_SAFETY_BUFFER_PX;
   const tabsStageDistancePx = tabsHiddenOffsetPx;
+
+  useIsomorphicLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    if (pendingTabRestoreRef.current !== activeTab) return;
+
+    let rafId = window.requestAnimationFrame(() => {
+      rafId = 0;
+
+      const section = tabContentSectionRef.current;
+      if (!section) {
+        pendingTabRestoreRef.current = null;
+        return;
+      }
+
+      const maxY = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
+      const fallbackY = Math.min(
+        Math.max(
+          section.getBoundingClientRect().top +
+            window.scrollY -
+            tabsHiddenOffsetPx,
+          0,
+        ),
+        maxY,
+      );
+
+      const activePanel = section.querySelector<HTMLElement>(
+        '[data-tab-panel-active="true"]',
+      );
+      const activeContentBottomY = activePanel
+        ? activePanel.getBoundingClientRect().bottom + window.scrollY
+        : fallbackY + window.innerHeight;
+      const savedY = tabScrollYByTabRef.current[activeTab];
+      const { targetY } = resolveTabScrollTarget({
+        savedY,
+        maxY,
+        viewportHeight: window.innerHeight,
+        activeContentBottomY,
+        fallbackY,
+      });
+
+      if (Math.abs(window.scrollY - targetY) > 1) {
+        window.scrollTo({ top: targetY, behavior: "auto" });
+      }
+
+      pendingTabRestoreRef.current = null;
+    });
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [activeTab, tabsHiddenOffsetPx]);
+
   useRegisterStickyActivation({
     sentinelRef: stickyActivationSentinelRef,
-    stickyTopPx: 56,
+    stickyTopPx: STICKY_TOP_PX,
     tabsHeight: stickyHeight,
     topBarHeight,
-    safetyBufferPx: 8,
+    safetyBufferPx: STICKY_SAFETY_BUFFER_PX,
     naturalBufferPx: 24,
     tabsStageDistancePx,
   });
 
+  const handleTabChange = useCallback((tab: AlbumTab) => {
+    switchTab(tab);
+  }, [switchTab]);
+
   const handleTabChangeByIndex = useCallback((index: number) => {
     const tab = albumTabs[index]?.id;
-    if (tab && tab !== activeTab) setActiveTab(tab);
-  }, [activeTab]);
+    if (!tab) return;
+    switchTab(tab);
+  }, [switchTab]);
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -142,7 +216,7 @@ export function StickerOSApp() {
             activeTab={activeTab}
             query={query}
             sortMode={sortMode}
-          hiddenProgress={tabsProgress}
+            hiddenProgress={tabsProgress}
             hiddenOffsetPx={tabsHiddenOffsetPx}
             isStickyActive={isStickyActive}
             onQueryChange={setQuery}
@@ -151,7 +225,10 @@ export function StickerOSApp() {
           />
         </div>
 
-        <section className="min-h-[calc(100dvh-8rem)] bg-background pt-4">
+        <section
+          ref={tabContentSectionRef}
+          className="min-h-[calc(100dvh-8rem)] bg-background pt-4"
+        >
           <AlbumTabPanel
             activeTabIndex={activeTabIndex}
             onTabChange={handleTabChangeByIndex}
