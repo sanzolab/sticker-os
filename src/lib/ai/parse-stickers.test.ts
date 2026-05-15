@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import sharp from "sharp";
 import {
   parseStickersFromInput,
@@ -687,9 +689,10 @@ describe("deterministic sticker parsing", () => {
       }
 
       const metadata = await sharp(Buffer.from(input.file.data)).metadata();
-      expect(metadata.width).toBeLessThanOrEqual(1600);
+      expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBeLessThanOrEqual(1024);
       expect(metadata.format).toBe("jpeg");
       expect(input.file.mimeType).toBe("image/jpeg");
+      expect(hashArrayBuffer(input.file.data)).not.toBe(hashBuffer(largePng));
 
       return {
         provider: "gemini",
@@ -717,6 +720,113 @@ describe("deterministic sticker parsing", () => {
     );
 
     expect(providerParser).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps portrait uploads by longest side before model parsing", async () => {
+    const portraitPng = await sharp({
+      create: {
+        width: 900,
+        height: 2400,
+        channels: 3,
+        background: { r: 230, g: 230, b: 230 },
+      },
+    }).png().toBuffer();
+    const providerParser = vi.fn().mockImplementation(async (input) => {
+      if (input.type !== "image") {
+        throw new Error("Expected image input.");
+      }
+
+      const metadata = await sharp(Buffer.from(input.file.data)).metadata();
+      expect(metadata.format).toBe("jpeg");
+      expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBe(1024);
+      expect(metadata.width).toBeLessThanOrEqual(1024);
+      expect(metadata.height).toBeLessThanOrEqual(1024);
+
+      return {
+        provider: "gemini",
+        model: "configured-model",
+        result: {
+          stickers: [],
+          unresolved: [],
+        },
+      };
+    });
+
+    await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: toArrayBuffer(portraitPng),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    expect(providerParser).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs privacy-safe image diagnostics for original and provider-input hashes", async () => {
+    const diagnosticsSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const inputPng = await sharp({
+      create: {
+        width: 1800,
+        height: 1200,
+        channels: 3,
+        background: { r: 250, g: 250, b: 250 },
+      },
+    }).png().toBuffer();
+    const providerParser = vi.fn().mockResolvedValue({
+      provider: "gemini",
+      model: "configured-model",
+      result: {
+        stickers: [],
+        unresolved: [],
+      },
+    });
+
+    await parseStickersFromInput(
+      {
+        type: "image",
+        file: {
+          data: toArrayBuffer(inputPng),
+          mimeType: "image/png",
+        },
+      },
+      { providerParser },
+    );
+
+    const diagnosticCalls = diagnosticsSpy.mock.calls.filter((call) =>
+      call[0] === "[ai.parse] image diagnostics"
+    );
+    expect(diagnosticCalls).toHaveLength(2);
+
+    const original = diagnosticCalls.find((call) => call[1]?.stage === "original")?.[1];
+    const providerInput = diagnosticCalls.find((call) => call[1]?.stage === "provider-input")?.[1];
+
+    expect(original).toMatchObject({
+      stage: "original",
+      mimeType: "image/png",
+      hashSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(providerInput).toMatchObject({
+      stage: "provider-input",
+      mimeType: "image/jpeg",
+      hashSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(providerInput?.hashSha256).not.toBe(original?.hashSha256);
+    expect(original).not.toHaveProperty("imageBase64");
+    expect(original).not.toHaveProperty("data");
+    expect(original).not.toHaveProperty("url");
+    expect(providerInput).not.toHaveProperty("imageBase64");
+    expect(providerInput).not.toHaveProperty("data");
+    expect(providerInput).not.toHaveProperty("url");
+  });
+
+  it("keeps preprocessing neutral without sharpen or linear transforms", () => {
+    const source = readFileSync(new URL("./parse-stickers.ts", import.meta.url), "utf8");
+    expect(source).not.toContain(".sharpen(");
+    expect(source).not.toContain(".linear(");
   });
 
   it("uses OpenAI fallback after a fast non-timeout Gemini failure", async () => {
@@ -890,4 +1000,18 @@ function getStickerCodes(result: ReturnType<typeof parseVoiceTranscriptDetermini
   return result.candidates.map((candidate) => {
     return `${getGroupCode(candidate.sticker)} ${candidate.sticker.number}`;
   });
+}
+
+function toArrayBuffer(buffer: Buffer) {
+  const arrayBuffer = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(arrayBuffer).set(buffer);
+  return arrayBuffer;
+}
+
+function hashBuffer(buffer: Buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+function hashArrayBuffer(value: ArrayBuffer) {
+  return hashBuffer(Buffer.from(value));
 }

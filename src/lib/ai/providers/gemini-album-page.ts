@@ -54,6 +54,7 @@ Do not identify players.
 Do not return player names.
 Do not list filled stickers.
 Only detect EMPTY album slots.
+Do not scan the entire page. Extract only clearly visible empty sticker slots.
 
 Step 1: Mentally rotate the image so the text is upright.
 Step 2: Detect all visible album placeholders.
@@ -124,84 +125,6 @@ JSON schema:
     "brief warning if needed"
   ]
 }`
-
-const useerprompt2=`Analyze this Panini World Cup 2026 album page photo.
-
-This is an inventory task.
-Do not identify players.
-Do not return player names.
-Do not describe stickers that are already pasted.
-Do not list present stickers.
-
-Your task is to detect ONLY EMPTY album slots with printed numbers.
-
-A slot is EMPTY / "faltante" when:
-- it is bare album paper
-- it has no pasted sticker
-- it shows a printed slot number on the album page
-- it looks like an empty placeholder/frame
-
-A slot is NOT empty when:
-- a physical sticker is pasted there
-- it shows a player photo, team photo, shield, crest, logo, artwork, or glossy sticker surface
-
-Important:
-- Only list empty slots.
-- Do not list filled slots.
-- Do not infer or guess empty numbers that are not visible.
-- Do not return player names.
-- Do not return sticker descriptions.
-- If a printed empty-slot number is readable, include it.
-- If an empty slot is visible but the number is unreadable, put it in "uncertainEmptySlots".
-- If the photo is cropped, rotated, blurry, or does not show the full page, reflect that in the output.
-
-Determine:
-- pageType: "team", "cc", "fwc", or null
-- country: full country name if visible and this is a team page, otherwise null
-- group:
-  - for team pages, the 3-letter country/team code if identifiable
-  - for Coca-Cola pages, "CC"
-  - for FWC pages, "FWC"
-  - null if not identifiable
-- isFullTeamPage:
-  - true only if this is a team page and all 20 team slots are visible
-  - false otherwise
-- imageQuality: "good", "ok", or "poor"
-
-For team pages:
-- Expected slot numbers are "1" through "20".
-- Do not output presentes.
-- The backend will calculate presentes by subtracting faltantes from 1..20.
-- Therefore, be conservative: only report a faltante when the empty slot and its number are clearly visible.
-
-Return strict JSON only.
-No markdown.
-No explanations.
-
-JSON schema:
-{
-  "pageType": "team | cc | fwc | null",
-  "country": "string or null",
-  "group": "string or null",
-  "isFullTeamPage": true,
-  "imageQuality": "good | ok | poor",
-  "faltantes": [
-    {
-      "group": "string or null",
-      "number": "string"
-    }
-  ],
-  "uncertainEmptySlots": [
-    {
-      "group": "string or null",
-      "number": "string or null",
-      "reason": "brief reason"
-    }
-  ],
-  "warnings": [
-    "brief warning if needed"
-  ]
-}`;
 
 const RESPONSE_SCHEMA = {
   type: "OBJECT",

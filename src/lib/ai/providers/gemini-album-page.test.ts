@@ -69,7 +69,10 @@ describe("analyzeAlbumPage", () => {
       };
     };
 
-    expect(payload.contents[0]?.parts[0]?.text).toContain("Do not list present stickers");
+    expect(payload.contents[0]?.parts[0]?.text).toContain("Do not list filled stickers");
+    expect(payload.contents[0]?.parts[0]?.text).toContain(
+      "Do not scan the entire page. Extract only clearly visible empty sticker slots.",
+    );
     expect(payload.contents[0]?.parts[0]?.text).not.toContain("\"presentes\"");
     expect(payload.generationConfig.responseSchema.properties.presentes).toBeUndefined();
     expect(payload.generationConfig.responseSchema.properties.faltantes).toBeDefined();

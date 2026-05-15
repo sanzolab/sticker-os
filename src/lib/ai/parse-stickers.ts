@@ -24,6 +24,7 @@ import { analyzeAlbumPage } from "@/lib/ai/providers/gemini-album-page";
 import { parseStickersWithGemini } from "@/lib/ai/providers/gemini";
 import { parseStickersWithOpenAi } from "@/lib/ai/providers/openai";
 import { logger } from "@/lib/logger";
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 
 export { parseTextDeterministically } from "@/lib/ai/deterministic";
@@ -54,8 +55,11 @@ const parseTimeoutMs = getCappedNumberEnv("AI_PARSE_TIMEOUT_MS", 15000, 20000);
 const fallbackFastFailureMs = getCappedNumberEnv("AI_FAST_FAIL_FALLBACK_MS", 3000, 10000);
 const maxImageSuggestions = getNumberEnv("AI_MAX_IMAGE_SUGGESTIONS", 12);
 const maxUnresolvedSuggestions = getNumberEnv("AI_MAX_UNRESOLVED_SUGGESTIONS", 12);
-const imageResizeMaxWidth = getNumberEnv("AI_IMAGE_MAX_WIDTH", 1600);
-const imageResizeQuality = getNumberEnv("AI_IMAGE_QUALITY", 90);
+const imageResizeMaxSide = getNumberEnv(
+  "AI_IMAGE_MAX_SIDE",
+  getNumberEnv("AI_IMAGE_MAX_WIDTH", 1024),
+);
+const imageResizeQuality = getNumberEnv("AI_IMAGE_QUALITY", 70);
 const imageCodePattern = /\b(?:[a-z]{2,4})\s*[- ]?\s*(?:00|\d{1,2})\b/i;
 const weakVisualEvidenceValues = new Set([
   "weak",
@@ -89,6 +93,17 @@ type ImageResolvedCandidate = {
 
 type TimingContext = {
   labelPrefix: string;
+};
+
+type ImageDiagnostics = {
+  stage: "original" | "provider-input";
+  mimeType: string;
+  byteSize: number;
+  hashSha256: string;
+  format: string | null;
+  width: number | null;
+  height: number | null;
+  exifOrientation: number | null;
 };
 
 export async function parseStickersFromInput(
@@ -735,16 +750,44 @@ async function preprocessImageInput(
   if (input.type !== "image") return input;
 
   const preprocessTimer = startTimer(timing, "image-preprocess");
+  const originalBuffer = Buffer.from(input.file.data);
+  const originalHash = sha256(originalBuffer);
+  const originalMetadata = await readImageMetadata(originalBuffer);
+  logImageDiagnostics({
+    stage: "original",
+    mimeType: input.file.mimeType,
+    byteSize: originalBuffer.byteLength,
+    hashSha256: originalHash,
+    format: originalMetadata.format,
+    width: originalMetadata.width,
+    height: originalMetadata.height,
+    exifOrientation: originalMetadata.exifOrientation,
+  });
 
   try {
-    const resized = await sharp(Buffer.from(input.file.data))
+    const resized = await sharp(originalBuffer)
       .rotate()
-      .resize({ width: imageResizeMaxWidth, fit: "inside", withoutEnlargement: true })
-      .sharpen({ sigma: 1 })
-      .linear(1.04, -4)
+      .resize({
+        width: imageResizeMaxSide,
+        height: imageResizeMaxSide,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
       .jpeg({ quality: imageResizeQuality });
 
     const buffer = await resized.toBuffer();
+    const providerMetadata = await readImageMetadata(buffer);
+    logImageDiagnostics({
+      stage: "provider-input",
+      mimeType: "image/jpeg",
+      byteSize: buffer.byteLength,
+      hashSha256: sha256(buffer),
+      format: providerMetadata.format,
+      width: providerMetadata.width,
+      height: providerMetadata.height,
+      exifOrientation: providerMetadata.exifOrientation,
+    });
+
     const arrayBuffer = new ArrayBuffer(buffer.byteLength);
     new Uint8Array(arrayBuffer).set(buffer);
     return {
@@ -755,9 +798,37 @@ async function preprocessImageInput(
         mimeType: "image/jpeg",
       },
     };
-  } catch {
+  } catch (error) {
+    logger.error("[ai.parse] image preprocessing failed", error);
     return input;
   } finally {
     endTimer(preprocessTimer);
   }
+}
+
+function sha256(buffer: Buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+async function readImageMetadata(buffer: Buffer) {
+  try {
+    const metadata = await sharp(buffer).metadata();
+    return {
+      format: metadata.format ?? null,
+      width: metadata.width ?? null,
+      height: metadata.height ?? null,
+      exifOrientation: metadata.orientation ?? null,
+    };
+  } catch {
+    return {
+      format: null,
+      width: null,
+      height: null,
+      exifOrientation: null,
+    };
+  }
+}
+
+function logImageDiagnostics(diagnostics: ImageDiagnostics) {
+  console.info("[ai.parse] image diagnostics", diagnostics);
 }
