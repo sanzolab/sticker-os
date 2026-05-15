@@ -31,6 +31,8 @@ describe("PhotoCapturePanel", () => {
     expect(panel.className).toContain("photo-capture-panel");
     expect(screen.getByRole("button", { name: "Take photo" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Choose from gallery" })).toBeTruthy();
+    expect(screen.getByLabelText("Take photo").getAttribute("accept")).toBe("image/*");
+    expect(screen.getByLabelText("Choose from gallery").getAttribute("accept")).toBe("image/*");
   });
 
   it("does not render when photo mode is not active", () => {

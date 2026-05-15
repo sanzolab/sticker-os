@@ -14,6 +14,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ImageUploadPreparationError,
+  prepareImageForUpload,
+} from "@/lib/image-upload";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 import { useAssistantStore } from "@/lib/assistant-store";
@@ -136,9 +140,23 @@ export function PhotoCapturePanel() {
     setMode("loading");
     setCaptureFeedback(null);
 
+    let uploadFile = file;
+    try {
+      uploadFile = await prepareImageForUpload(file);
+    } catch (error) {
+      if (error instanceof ImageUploadPreparationError) {
+        setCaptureFeedback({
+          title: t(locale, "addStickers.error.title"),
+          message: t(locale, "addStickers.error.imagePreparation"),
+        });
+        return;
+      }
+      throw error;
+    }
+
     const formData = new FormData();
     formData.append("type", "image");
-    formData.append("file", file);
+    formData.append("file", uploadFile);
 
     try {
       const result = await requestAnalysisResult(() =>
@@ -430,7 +448,7 @@ export function PhotoCapturePanel() {
         <input
           id={cameraInputId}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*"
           capture="environment"
           aria-label={t(locale, "addStickers.photoPanel.takePhoto")}
           className="sr-only"
@@ -446,7 +464,7 @@ export function PhotoCapturePanel() {
         <input
           id={galleryInputId}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*"
           aria-label={t(locale, "addStickers.photoPanel.chooseFromGallery")}
           className="sr-only"
           onClick={(event) => {

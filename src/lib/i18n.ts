@@ -223,6 +223,8 @@ const translations = {
     "addStickers.error.title": "Could not analyze stickers",
     "addStickers.error.generic":
       "Something went wrong while analyzing those stickers.",
+    "addStickers.error.imagePreparation":
+      "This photo format could not be prepared on this device. Please try again, select the photo from your gallery, or use a JPEG/PNG image.",
     "addStickers.error.timeout":
       "Analysis took too long. Try again with a clearer photo.",
     "addStickers.back": "Back",
@@ -467,6 +469,8 @@ const translations = {
     "addStickers.error.title": "No se pudieron analizar las figuritas",
     "addStickers.error.generic":
       "Algo salió mal al analizar esas figuritas.",
+    "addStickers.error.imagePreparation":
+      "No se pudo preparar este formato de foto en este dispositivo. Intenta de nuevo, elige la foto desde la galería o usa una imagen JPEG/PNG.",
     "addStickers.error.timeout":
       "El análisis tardó demasiado. Intenta de nuevo con una foto más clara.",
     "addStickers.back": "Volver",

@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { analyzeVoiceSubmission } from "@/lib/voice-submit";
+import {
+  ImageUploadPreparationError,
+  prepareImageForUpload,
+} from "@/lib/image-upload";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 import { useAssistantStore } from "@/lib/assistant-store";
@@ -162,9 +166,26 @@ export function AddStickersDrawer({
   }, [analyzeRequest]);
 
   const analyzeFile = useCallback(async (type: "image" | "audio", file: File) => {
+    let uploadFile = file;
+    if (type === "image") {
+      try {
+        uploadFile = await prepareImageForUpload(file);
+      } catch (error) {
+        if (error instanceof ImageUploadPreparationError) {
+          setModeOverride("capture");
+          setError({
+            code: error.code,
+            message: t(locale, "addStickers.error.imagePreparation"),
+          });
+          return;
+        }
+        throw error;
+      }
+    }
+
     const formData = new FormData();
     formData.append("type", type);
-    formData.append("file", file);
+    formData.append("file", uploadFile);
 
     await analyzeRequest(() =>
       fetchWithAddStickersTimeout("/api/ai/parse-stickers", {
@@ -172,7 +193,7 @@ export function AddStickersDrawer({
         body: formData,
       }),
     );
-  }, [analyzeRequest]);
+  }, [analyzeRequest, locale]);
 
   const handleVoiceSubmission = useCallback(async (submission: AddStickersVoiceSubmission) => {
     setIsLoading(true);

@@ -129,6 +129,24 @@ describe("AddStickersDrawer", () => {
     expect(screen.getByText("Analysis took too long. Try again with a clearer photo.")).toBeTruthy();
     expect(screen.queryByText("Analyzing stickers")).toBeNull();
   });
+
+  it("shows preparation error and skips request for non-image queued capture", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    useAssistantStore.setState({
+      queuedPhotoCapture: {
+        id: 1,
+        file: new File(["image"], "capture.txt", { type: "text/plain" }),
+      },
+    });
+
+    render(<AddStickersDrawer open onOpenChange={vi.fn()} />);
+
+    expect(await screen.findByText("Could not analyze stickers")).toBeTruthy();
+    expect(screen.getByText("This photo format could not be prepared on this device. Please try again, select the photo from your gallery, or use a JPEG/PNG image.")).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 function candidate(

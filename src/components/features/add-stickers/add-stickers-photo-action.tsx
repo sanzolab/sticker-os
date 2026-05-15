@@ -48,7 +48,7 @@ export function AddStickersPhotoAction({
       <input
         id={inputId}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
         capture="environment"
         className="sr-only"
         disabled={loading}
