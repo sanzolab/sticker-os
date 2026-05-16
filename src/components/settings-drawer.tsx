@@ -1,7 +1,7 @@
 "use client";
 
 import { Copy, Download, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AppDrawer } from "@/components/ui/app-drawer";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { OptionGroup } from "@/components/ui/option-group";
 import { localeOptions, t } from "@/lib/i18n";
+import { extractCacheNameFromServiceWorker, extractCacheVersion } from "@/lib/service-worker";
 import { useStickerStore, type ThemePreference } from "@/lib/store";
 import { stickerExportOptions, buildTxtExportByKind, getExportMeta, type ExportKind } from "@/lib/export";
 import { copyText, downloadText } from "./export-actions";
@@ -31,6 +32,7 @@ export function SettingsDrawer({
   const updateSetting = useStickerStore((state) => state.updateSetting);
   const resetCollection = useStickerStore((state) => state.resetCollection);
   const locale = useStickerStore((state) => state.settings.locale);
+  const [cacheVersion, setCacheVersion] = useState<string | null>(null);
 
   const getExportText = () =>
     buildTxtExportByKind(
@@ -45,6 +47,34 @@ export function SettingsDrawer({
     updateSetting("theme", theme);
     setTheme(theme);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const readCacheName = async () => {
+      try {
+        const response = await fetch("/sw.js", { cache: "no-store" });
+        if (!response.ok) {
+          if (isMounted) setCacheVersion("");
+          return;
+        }
+        const script = await response.text();
+        const currentCacheName = extractCacheNameFromServiceWorker(script);
+        const currentCacheVersion = currentCacheName
+          ? extractCacheVersion(currentCacheName)
+          : null;
+        if (isMounted) setCacheVersion(currentCacheVersion ?? "");
+      } catch {
+        if (isMounted) setCacheVersion("");
+      }
+    };
+
+    void readCacheName();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <AppDrawer open={open} onOpenChange={onOpenChange}>
@@ -96,6 +126,19 @@ export function SettingsDrawer({
             checked={settings.animations}
             onChange={(checked) => updateSetting("animations", checked)}
           />
+        </div>
+        <div className="space-y-2 border-t pt-4">
+          <p className="text-sm font-medium">
+            {t(locale, "settings.cacheVersion.title")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t(locale, "settings.cacheVersion.description")}
+          </p>
+          <p className="rounded-sm border bg-muted/40 px-3 py-2 font-mono text-xs">
+            {cacheVersion === null
+              ? t(locale, "settings.cacheVersion.loading")
+              : cacheVersion || t(locale, "settings.cacheVersion.unavailable")}
+          </p>
         </div>
         <div className="space-y-3 border-t pt-4">
           <div>

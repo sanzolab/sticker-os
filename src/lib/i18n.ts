@@ -55,6 +55,11 @@ const translations = {
     "settings.compactGrid.description": "Tighter sticker spacing.",
     "settings.animations.title": "Animations",
     "settings.animations.description": "Subtle press feedback.",
+    "settings.cacheVersion.title": "Cache version",
+    "settings.cacheVersion.description":
+      "Current service worker cache name from this app build.",
+    "settings.cacheVersion.loading": "Reading...",
+    "settings.cacheVersion.unavailable": "Unavailable",
     "settings.export.title": "Export",
     "settings.export.copyTxt": "Copy TXT",
     "settings.export.download": "Download",
@@ -299,6 +304,11 @@ const translations = {
     "settings.compactGrid.description": "Más espacio entre figuritas.",
     "settings.animations.title": "Animaciones",
     "settings.animations.description": "Respuesta sutil al pulsar.",
+    "settings.cacheVersion.title": "Versión de caché",
+    "settings.cacheVersion.description":
+      "Nombre de caché actual del service worker de esta versión.",
+    "settings.cacheVersion.loading": "Leyendo...",
+    "settings.cacheVersion.unavailable": "No disponible",
     "settings.export.title": "Exportar",
     "settings.export.copyTxt": "Copiar TXT",
     "settings.export.download": "Descargar",
