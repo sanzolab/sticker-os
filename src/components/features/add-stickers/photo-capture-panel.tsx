@@ -38,6 +38,13 @@ type CaptureFeedback = {
   title: string;
   message: string;
 };
+type PhotoCaptureOptions = {
+  forceNormalize?: boolean;
+};
+type PendingPhotoCapture = {
+  file: File;
+  options?: PhotoCaptureOptions;
+};
 
 export function PhotoCapturePanel() {
   const activeMode = useAssistantStore((state) => state.activeMode);
@@ -60,7 +67,7 @@ export function PhotoCapturePanel() {
 
   const [mode, setMode] = useState<PhotoCaptureMode>("capture");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFile, setPendingFile] = useState<PendingPhotoCapture | null>(null);
   const [captureFeedback, setCaptureFeedback] = useState<CaptureFeedback | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [exiting, setExiting] = useState(false);
@@ -98,13 +105,22 @@ export function PhotoCapturePanel() {
   > => {
     try {
       const response = await request();
-      const body = (await response.json()) as AddStickersResult | AddStickersError;
+      const body = await readJsonBody(response);
       if (!response.ok) {
         return {
           ok: false,
           error: {
-            code: "code" in body ? body.code : "AI_PROVIDER_ERROR",
-            message: "message" in body ? body.message : t(locale, "addStickers.error.generic"),
+            code: readStringField(body, "code") ?? "AI_PROVIDER_ERROR",
+            message: readStringField(body, "message") ?? t(locale, "addStickers.error.generic"),
+          },
+        };
+      }
+      if (!body) {
+        return {
+          ok: false,
+          error: {
+            code: "AI_PROVIDER_ERROR",
+            message: t(locale, "addStickers.error.generic"),
           },
         };
       }
@@ -136,19 +152,20 @@ export function PhotoCapturePanel() {
     }
   }, [locale]);
 
-  const analyzePhoto = useCallback(async (file: File) => {
+  const analyzePhoto = useCallback(async (file: File, options: PhotoCaptureOptions = {}) => {
     setMode("loading");
     setCaptureFeedback(null);
 
     let uploadFile = file;
     try {
-      uploadFile = await prepareImageForUpload(file);
+      uploadFile = await prepareImageForUpload(file, options);
     } catch (error) {
       if (error instanceof ImageUploadPreparationError) {
         setCaptureFeedback({
           title: t(locale, "addStickers.error.title"),
           message: t(locale, "addStickers.error.imagePreparation"),
         });
+        setMode("capture");
         return;
       }
       throw error;
@@ -190,14 +207,14 @@ export function PhotoCapturePanel() {
     }
   }, [appendResult, locale, requestAnalysisResult]);
 
-  const handleCapture = useCallback((file: File) => {
+  const handleCapture = useCallback((file: File, options: PhotoCaptureOptions = {}) => {
     setCaptureFeedback(null);
     if (pendingCount > 0) {
-      setPendingFile(file);
+      setPendingFile({ file, options });
       setConfirmOpen(true);
       return;
     }
-    void analyzePhoto(file);
+    void analyzePhoto(file, options);
   }, [analyzePhoto, pendingCount]);
 
   const clearConfirmState = useCallback(() => {
@@ -211,9 +228,9 @@ export function PhotoCapturePanel() {
   }, [clearConfirmState]);
 
   const handleStartNewCapture = useCallback(() => {
-    const file = pendingFile;
+    const pending = pendingFile;
     clearConfirmState();
-    if (file) void analyzePhoto(file);
+    if (pending) void analyzePhoto(pending.file, pending.options);
   }, [analyzePhoto, clearConfirmState, pendingFile]);
 
   const confirmAdd = useCallback(() => {
@@ -457,7 +474,7 @@ export function PhotoCapturePanel() {
           }}
           onChange={(event) => {
             const file = event.target.files?.[0];
-            if (file) handleCapture(file);
+            if (file) handleCapture(file, { forceNormalize: true });
             event.target.value = "";
           }}
         />
@@ -509,4 +526,18 @@ export function PhotoCapturePanel() {
       </AlertDialog>
     </>
   );
+}
+
+async function readJsonBody(response: Response) {
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function readStringField(body: unknown, field: string) {
+  if (typeof body !== "object" || body === null || !(field in body)) return undefined;
+  const value = (body as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : undefined;
 }

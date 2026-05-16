@@ -19,6 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   cleanup();
 });
@@ -117,6 +118,81 @@ describe("PhotoCapturePanel", () => {
     expect(useAssistantStore.getState().activeMode).toBe("photo");
     expect(useAssistantStore.getState().addStickersOpen).toBe(false);
     expect(screen.getByRole("button", { name: "Remove ARG7" })).toBeTruthy();
+  });
+
+  it("normalizes camera captures before upload", async () => {
+    mockCanvasJpegConversion({ width: 4000, height: 3000 });
+    let uploadedFile: File | null = null;
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      uploadedFile = (init?.body as FormData).get("file") as File;
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          candidates: [],
+          unresolved: [],
+          provider: "deterministic",
+          source: "image",
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PhotoCapturePanel />);
+    const file = new File(["photo"], "camera.jpg", { type: "image/jpeg" });
+
+    fireEvent.change(screen.getByLabelText("Take photo"), { target: { files: [file] } });
+
+    expect(await screen.findByText("No stickers found")).toBeTruthy();
+    const uploaded = expectUploadedFile(uploadedFile);
+    expect(uploaded).not.toBe(file);
+    expect(uploaded.type).toBe("image/jpeg");
+    expect(uploaded.name).toBe("camera.jpg");
+    expect(uploaded.size).toBe(new Blob(["converted"]).size);
+  });
+
+  it("normalizes oversized gallery images before upload", async () => {
+    mockCanvasJpegConversion({ width: 3200, height: 2400 });
+    let uploadedFile: File | null = null;
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      uploadedFile = (init?.body as FormData).get("file") as File;
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          candidates: [],
+          unresolved: [],
+          provider: "deterministic",
+          source: "image",
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PhotoCapturePanel />);
+    const file = new File([new Uint8Array(4 * 1024 * 1024 + 1)], "gallery.jpg", {
+      type: "image/jpeg",
+    });
+
+    fireEvent.change(screen.getByLabelText("Choose from gallery"), { target: { files: [file] } });
+
+    expect(await screen.findByText("No stickers found")).toBeTruthy();
+    const uploaded = expectUploadedFile(uploadedFile);
+    expect(uploaded).not.toBe(file);
+    expect(uploaded.type).toBe("image/jpeg");
+    expect(uploaded.name).toBe("gallery.jpg");
+  });
+
+  it("shows preparation error and skips request when camera photo cannot be prepared", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PhotoCapturePanel />);
+
+    const file = new File(["not image"], "camera.txt", { type: "text/plain" });
+    fireEvent.change(screen.getByLabelText("Take photo"), { target: { files: [file] } });
+
+    expect(await screen.findByText("Could not analyze stickers")).toBeTruthy();
+    expect(screen.getByText("This photo format could not be prepared on this device. Please try again, select the photo from your gallery, or use a JPEG/PNG image.")).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("shows inline empty-result feedback and stays in capture mode", async () => {
@@ -314,4 +390,47 @@ function waitForTimeout(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function mockCanvasJpegConversion({
+  width,
+  height,
+}: {
+  width: number;
+  height: number;
+}) {
+  vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({
+    width,
+    height,
+    close: vi.fn(),
+  }));
+
+  const canvasMock = {
+    width: 0,
+    height: 0,
+    getContext: vi.fn().mockReturnValue({ drawImage: vi.fn() }),
+    toBlob: vi.fn((callback: BlobCallback, type?: string, quality?: number) => {
+      expect(type).toBe("image/jpeg");
+      expect(quality).toBe(0.92);
+      callback(new Blob(["converted"], { type: "image/jpeg" }));
+    }),
+  } as unknown as HTMLCanvasElement;
+
+  const originalCreateElement = document.createElement.bind(document);
+  vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
+    if (tagName === "canvas") {
+      return canvasMock;
+    }
+    return originalCreateElement(tagName);
+  });
+
+  return canvasMock;
+}
+
+function expectUploadedFile(file: File | null) {
+  expect(file).not.toBeNull();
+  if (!file) {
+    throw new Error("Expected upload file.");
+  }
+  return file;
 }

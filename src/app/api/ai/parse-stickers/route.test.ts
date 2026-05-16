@@ -27,10 +27,12 @@ import { POST } from "./route";
 
 describe("POST /api/ai/parse-stickers", () => {
   const originalMaxAudioMb = process.env.AI_MAX_AUDIO_MB;
+  const originalMaxImageMb = process.env.AI_MAX_IMAGE_MB;
 
   beforeEach(() => {
     parseStickersFromInputMock.mockReset();
     delete process.env.AI_MAX_AUDIO_MB;
+    delete process.env.AI_MAX_IMAGE_MB;
   });
 
   afterEach(() => {
@@ -38,6 +40,11 @@ describe("POST /api/ai/parse-stickers", () => {
       delete process.env.AI_MAX_AUDIO_MB;
     } else {
       process.env.AI_MAX_AUDIO_MB = originalMaxAudioMb;
+    }
+    if (originalMaxImageMb === undefined) {
+      delete process.env.AI_MAX_IMAGE_MB;
+    } else {
+      process.env.AI_MAX_IMAGE_MB = originalMaxImageMb;
     }
   });
 
@@ -132,11 +139,35 @@ describe("POST /api/ai/parse-stickers", () => {
     expect(parseStickersFromInputMock).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported image MIME types before calling the parser", async () => {
+    const response = await POST(
+      requestWithFile("image", new File(["image"], "capture.gif", { type: "image/gif" })),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("AI_UNSUPPORTED_MIME_TYPE");
+    expect(parseStickersFromInputMock).not.toHaveBeenCalled();
+  });
+
   it("rejects oversized audio before calling the parser", async () => {
     process.env.AI_MAX_AUDIO_MB = "0.000001";
 
     const response = await POST(
       requestWithFile("audio", new File(["voice"], "voice.webm", { type: "audio/webm" })),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("AI_FILE_TOO_LARGE");
+    expect(parseStickersFromInputMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized images before calling the parser", async () => {
+    process.env.AI_MAX_IMAGE_MB = "0.000001";
+
+    const response = await POST(
+      requestWithFile("image", new File(["image"], "capture.jpg", { type: "image/jpeg" })),
     );
     const body = await response.json();
 

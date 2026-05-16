@@ -57,9 +57,9 @@ const maxImageSuggestions = getNumberEnv("AI_MAX_IMAGE_SUGGESTIONS", 12);
 const maxUnresolvedSuggestions = getNumberEnv("AI_MAX_UNRESOLVED_SUGGESTIONS", 12);
 const imageResizeMaxSide = getNumberEnv(
   "AI_IMAGE_MAX_SIDE",
-  getNumberEnv("AI_IMAGE_MAX_WIDTH", 1024),
+  getNumberEnv("AI_IMAGE_MAX_WIDTH", 1600),
 );
-const imageResizeQuality = getNumberEnv("AI_IMAGE_QUALITY", 70);
+const imageResizeQuality = getNumberEnv("AI_IMAGE_QUALITY", 90);
 const imageCodePattern = /\b(?:[a-z]{2,4})\s*[- ]?\s*(?:00|\d{1,2})\b/i;
 const weakVisualEvidenceValues = new Set([
   "weak",
@@ -773,6 +773,8 @@ async function preprocessImageInput(
         fit: "inside",
         withoutEnlargement: true,
       })
+      .sharpen({ sigma: 0.6 })
+      .linear(1.04, -5)
       .jpeg({ quality: imageResizeQuality });
 
     const buffer = await resized.toBuffer();

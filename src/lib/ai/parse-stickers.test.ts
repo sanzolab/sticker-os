@@ -689,7 +689,7 @@ describe("deterministic sticker parsing", () => {
       }
 
       const metadata = await sharp(Buffer.from(input.file.data)).metadata();
-      expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBeLessThanOrEqual(1024);
+      expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBeLessThanOrEqual(1600);
       expect(metadata.format).toBe("jpeg");
       expect(input.file.mimeType).toBe("image/jpeg");
       expect(hashArrayBuffer(input.file.data)).not.toBe(hashBuffer(largePng));
@@ -738,9 +738,9 @@ describe("deterministic sticker parsing", () => {
 
       const metadata = await sharp(Buffer.from(input.file.data)).metadata();
       expect(metadata.format).toBe("jpeg");
-      expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBe(1024);
-      expect(metadata.width).toBeLessThanOrEqual(1024);
-      expect(metadata.height).toBeLessThanOrEqual(1024);
+      expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBe(1600);
+      expect(metadata.width).toBeLessThanOrEqual(1600);
+      expect(metadata.height).toBeLessThanOrEqual(1600);
 
       return {
         provider: "gemini",
@@ -823,10 +823,11 @@ describe("deterministic sticker parsing", () => {
     expect(providerInput).not.toHaveProperty("url");
   });
 
-  it("keeps preprocessing neutral without sharpen or linear transforms", () => {
+  it("applies deterministic light sharpening and mild contrast before model parsing", () => {
     const source = readFileSync(new URL("./parse-stickers.ts", import.meta.url), "utf8");
-    expect(source).not.toContain(".sharpen(");
-    expect(source).not.toContain(".linear(");
+    expect(source).toContain(".sharpen(");
+    expect(source).toContain(".linear(");
+    expect(source).toContain("getNumberEnv(\"AI_IMAGE_QUALITY\", 90)");
   });
 
   it("uses OpenAI fallback after a fast non-timeout Gemini failure", async () => {

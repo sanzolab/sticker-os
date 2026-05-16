@@ -35,6 +35,9 @@ import type {
 } from "./add-stickers-types";
 
 type AddStickersMode = "capture" | "loading" | "review";
+type AnalyzeFileOptions = {
+  forceNormalize?: boolean;
+};
 
 export function AddStickersDrawer({
   open,
@@ -82,18 +85,27 @@ export function AddStickersDrawer({
   > => {
     try {
       const response = await request();
-      const body = (await response.json()) as AddStickersResult | AddStickersError;
+      const body = await readJsonBody(response);
 
       if (!response.ok) {
         return {
           ok: false,
           error: {
-            code: "code" in body ? body.code : "AI_PROVIDER_ERROR",
-            message: "message" in body ? body.message : t(locale, "addStickers.error.generic"),
+            code: readStringField(body, "code") ?? "AI_PROVIDER_ERROR",
+            message: readStringField(body, "message") ?? t(locale, "addStickers.error.generic"),
           },
         };
       }
 
+      if (!body) {
+        return {
+          ok: false,
+          error: {
+            code: "AI_PROVIDER_ERROR",
+            message: t(locale, "addStickers.error.generic"),
+          },
+        };
+      }
       const parsedResult = body as AddStickersResult;
       if (isFailedAnalysisResult(parsedResult)) {
         const isTimeout = parsedResult.meta?.timeout === true ||
@@ -165,11 +177,15 @@ export function AddStickersDrawer({
     );
   }, [analyzeRequest]);
 
-  const analyzeFile = useCallback(async (type: "image" | "audio", file: File) => {
+  const analyzeFile = useCallback(async (
+    type: "image" | "audio",
+    file: File,
+    options: AnalyzeFileOptions = {},
+  ) => {
     let uploadFile = file;
     if (type === "image") {
       try {
-        uploadFile = await prepareImageForUpload(file);
+        uploadFile = await prepareImageForUpload(file, options);
       } catch (error) {
         if (error instanceof ImageUploadPreparationError) {
           setModeOverride("capture");
@@ -275,7 +291,7 @@ export function AddStickersDrawer({
             <AddStickersCaptureOptions
               loading={loading}
               onSubmitAudio={(file) => analyzeFile("audio", file)}
-              onSubmitPhoto={(file) => analyzeFile("image", file)}
+              onSubmitPhoto={(file) => analyzeFile("image", file, { forceNormalize: true })}
               onSubmitText={analyzeText}
               onSubmitVoiceTranscript={handleVoiceSubmission}
               pendingCount={pendingCount}
@@ -322,4 +338,18 @@ export function AddStickersDrawer({
       </div>
     </AppDrawer>
   );
+}
+
+async function readJsonBody(response: Response) {
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function readStringField(body: unknown, field: string) {
+  if (typeof body !== "object" || body === null || !(field in body)) return undefined;
+  const value = (body as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : undefined;
 }

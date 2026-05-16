@@ -28,6 +28,12 @@ const MIME_EXTENSIONS: Record<string, Set<string>> = {
 
 const MAX_UPLOAD_IMAGE_SIDE = 2048;
 const JPEG_QUALITY = 0.92;
+const DEFAULT_MAX_BYTES_BEFORE_NORMALIZE = 4 * 1024 * 1024;
+
+export type PrepareImageForUploadOptions = {
+  forceNormalize?: boolean;
+  maxBytesBeforeNormalize?: number;
+};
 
 export class ImageUploadPreparationError extends Error {
   code: "IMAGE_UPLOAD_PREPARATION_FAILED";
@@ -39,8 +45,17 @@ export class ImageUploadPreparationError extends Error {
   }
 }
 
-export async function prepareImageForUpload(file: File): Promise<File> {
-  if (isTrustedUploadImage(file)) {
+export async function prepareImageForUpload(
+  file: File,
+  options: PrepareImageForUploadOptions = {},
+): Promise<File> {
+  const maxBytesBeforeNormalize =
+    options.maxBytesBeforeNormalize ?? DEFAULT_MAX_BYTES_BEFORE_NORMALIZE;
+  const shouldNormalize =
+    options.forceNormalize === true ||
+    file.size > maxBytesBeforeNormalize;
+
+  if (isTrustedUploadImage(file) && !shouldNormalize) {
     return file;
   }
 
@@ -73,7 +88,7 @@ function isLikelyImageFile(file: File) {
   if (mimeType.startsWith("image/")) return true;
   if (mimeType === "application/octet-stream" || mimeType === "") {
     const extension = getFileExtension(file.name);
-    return extension ? IMAGE_LIKE_EXTENSIONS.has(extension) : false;
+    return extension ? IMAGE_LIKE_EXTENSIONS.has(extension) : true;
   }
   return false;
 }
