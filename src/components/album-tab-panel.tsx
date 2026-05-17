@@ -103,23 +103,17 @@ function AlbumTabContent({
       active={active}
       className="space-y-4 bg-background"
     >
-      {sections.map(
-        (
-          { group, stickers: groupStickers, missing, duplicates },
-          sectionIndex,
-        ) => (
-          <StickerSection
-            key={group.id}
-            active={active}
-            group={group}
-            stickers={groupStickers}
-            missing={missing}
-            duplicates={duplicates}
-            sectionIndex={sectionIndex}
-            onEditDuplicates={onEditDuplicates}
-          />
-        ),
-      )}
+      {sections.map(({ group, stickers: groupStickers, missing, duplicates }) => (
+        <StickerSection
+          key={group.id}
+          active={active}
+          group={group}
+          stickers={groupStickers}
+          missing={missing}
+          duplicates={duplicates}
+          onEditDuplicates={onEditDuplicates}
+        />
+      ))}
 
       {sections.length === 0 && (
         <EmptyState

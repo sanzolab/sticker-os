@@ -17,25 +17,20 @@ export function AnimatedTabPanel({
   className,
   children,
 }: AnimatedTabPanelProps) {
-  const inactiveStyles = !active
-    ? {
-        height: 0,
-        overflow: "hidden" as const,
-        visibility: "hidden" as const,
-      }
-    : {};
-
   return (
     <section
       aria-hidden={!active || undefined}
       inert={!active || undefined}
-      className={cn("tab-slider-panel", className)}
+      className={cn(
+        "tab-slider-panel",
+        !active && "pointer-events-none",
+        className,
+      )}
       data-tab-panel
       data-tab-panel-active={active ? "true" : "false"}
       style={{
         flex: `0 0 calc(100% / ${tabCount})`,
         minWidth: 0,
-        ...inactiveStyles,
       }}
     >
       {children}

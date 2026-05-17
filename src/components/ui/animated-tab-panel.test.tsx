@@ -22,7 +22,7 @@ describe("AnimatedTabPanel", () => {
     expect(panel?.getAttribute("aria-hidden")).toBeNull();
   });
 
-  it("collapses inactive panels while preserving flex width and hidden accessibility state", () => {
+  it("holds inactive panels in layout and marks them non-interactive for accessibility", () => {
     render(
       <AnimatedTabPanel active={false} index={1} tabCount={4}>
         <div>hidden-content</div>
@@ -31,13 +31,14 @@ describe("AnimatedTabPanel", () => {
 
     const panel = screen.getByText("hidden-content").closest("section");
     expect(panel).not.toBeNull();
-    expect(panel?.style.height).toBe("0px");
-    expect(panel?.style.overflow).toBe("hidden");
-    expect(panel?.style.visibility).toBe("hidden");
+    expect(panel?.style.height).toBe("");
+    expect(panel?.style.overflow).toBe("");
+    expect(panel?.style.visibility).toBe("");
     expect(panel?.style.flex).toContain("0 0");
     expect(panel?.style.flex).toContain("25%");
     expect(panel?.style.minWidth).toBe("0");
     expect(panel?.getAttribute("aria-hidden")).toBe("true");
     expect(panel?.getAttribute("inert")).toBe("");
+    expect(panel?.className).toContain("pointer-events-none");
   });
 });
