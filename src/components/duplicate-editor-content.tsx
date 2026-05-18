@@ -28,7 +28,7 @@ export function DuplicateEditorContent({
   return (
     <AppDrawer
       open
-      bodyClassName="px-5 pb-5 pt-4 text-center"
+      bodyClassName="text-center"
       onOpenChange={(nextOpen) => {
         if (!nextOpen) setDraft(null);
         onOpenChange(nextOpen);

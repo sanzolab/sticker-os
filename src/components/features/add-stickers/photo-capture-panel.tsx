@@ -343,7 +343,7 @@ export function PhotoCapturePanel() {
             {mode === "loading" && <AddStickersLoadingState />}
 
             {mode === "capture" && (
-              <div className="min-h-0  space-y-5 overflow-y-auto px-5 pb-5">
+              <div className="min-h-0 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5">
                 <button
                   type="button"
                   className={`group flex w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${
@@ -424,7 +424,7 @@ export function PhotoCapturePanel() {
 
             {mode === "review" && (
               <>
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5">
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5">
                   <div>
                     <Badge variant="secondary" className="mb-3 rounded-sm">
                       {t(locale, "addStickers.badge")}

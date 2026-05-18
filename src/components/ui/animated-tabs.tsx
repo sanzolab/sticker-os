@@ -108,7 +108,7 @@ export function AnimatedTabs<T extends string>({
         <span
           aria-hidden="true"
           className={cn(
-            "absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-out",
+            "absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ease-out",
             indicatorClassName,
           )}
           style={{

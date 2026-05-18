@@ -2,7 +2,7 @@ export default function AppSkeleton() {
   return (
     <main className="min-h-dvh bg-background text-foreground animate-pulse">
       {/* HEADER */}
-      <header className="fixed inset-x-0 top-0 z-40 bg-background">
+      <header className="safe-top fixed inset-x-0 top-0 z-40 bg-background">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="h-6 w-28 rounded bg-muted" />
 
@@ -13,7 +13,7 @@ export default function AppSkeleton() {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-[4.75rem] sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-8 sm:px-6 lg:px-8" style={{ paddingTop: "calc(var(--top-bar-height) + 1.25rem)" }}>
         {/* TOP STATS */}
         <section className="mb-8 border rounded-sm divide-y">
           <div className="grid grid-cols-3 divide-x">
@@ -50,7 +50,7 @@ export default function AppSkeleton() {
         </section>
 
         {/* FILTER BAR */}
-        <section className="sticky top-14 z-30 -mx-4 bg-background px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <section className="sticky top-[var(--top-bar-height)] z-30 -mx-4 bg-background px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           {/* TABS */}
           <div className="grid grid-cols-4">
             {[...Array(4)].map((_, i) => (

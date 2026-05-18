@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
 import { Button } from "@/components/ui/button";
@@ -129,12 +129,12 @@ export function StickyControls({
           />
         )}
         <div
-          className={cn(
-            "sticky-controls-sticky-shell top-14 z-30 overflow-hidden",
-            isStickyActive
-              ? "fixed inset-x-0 mx-auto max-w-5xl"
-              : "sticky",
-          )}
+            className={cn(
+              "sticky-controls-sticky-shell top-[var(--top-bar-height)] z-30 overflow-hidden",
+              isStickyActive
+                ? "fixed inset-x-0 mx-auto max-w-5xl"
+                : "sticky",
+            )}
           style={shellStyle}
         >
           <div
@@ -151,11 +151,35 @@ export function StickyControls({
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  data-search-input
                   value={query}
                   onChange={(event) => onQueryChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && query.length > 0) {
+                      event.preventDefault();
+                      onQueryChange("");
+                      (event.target as HTMLInputElement)?.focus();
+                    }
+                  }}
                   placeholder={t(locale, "common.searchPlaceholder")}
-                  className="h-12 pl-10 text-base shadow-none"
+                  className="h-12 pl-10 pr-10 text-base shadow-none"
                 />
+                {query.length > 0 && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground active:bg-accent"
+                    onClick={() => {
+                      onQueryChange("");
+                      const input = document.querySelector<HTMLInputElement>(
+                        "[data-search-input]",
+                      );
+                      input?.focus();
+                    }}
+                    aria-label={t(locale, "common.clearSearch")}
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
               </div>
               <Button
                 variant="outline"

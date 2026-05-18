@@ -177,6 +177,7 @@ export function TradeDrawer({
     <AppDrawer
       open={open}
       onOpenChange={handleOpenChange}
+      scrollable={false}
       bodyClassName="flex min-h-0 flex-1 flex-col p-0"
     >
       <div className="flex min-h-0 flex-1 flex-col">
@@ -267,7 +268,7 @@ export function TradeDrawer({
 
         {step === "result" && result && (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5 pt-4">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5 pt-4">
               <DrawerHeader
                 title={t(locale, "trade.comparison.title")}
                 description={t(locale, "trade.comparison.description", {
@@ -317,7 +318,7 @@ export function TradeDrawer({
               )}
             </div>
 
-            <div className="border-t bg-card p-5">
+            <div className="safe-bottom border-t bg-card p-5">
               {result.receiveIds.length === 0 && result.giveIds.length === 0 ? (
                 <Button
                   type="button"

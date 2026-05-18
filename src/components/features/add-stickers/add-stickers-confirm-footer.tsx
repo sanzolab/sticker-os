@@ -18,7 +18,7 @@ export function AddStickersConfirmFooter({
   const locale = useStickerStore((state) => state.settings.locale);
 
   return (
-    <div className="grid gap-3 border-t bg-card p-5 sm:grid-cols-[auto_auto_1fr]">
+    <div className="safe-bottom grid gap-3 border-t bg-card p-5 sm:grid-cols-[auto_auto_1fr]">
       <Button
         type="button"
         variant="secondary"

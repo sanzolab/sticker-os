@@ -269,20 +269,18 @@ export function AddStickersDrawer({
     <AppDrawer
       open={open}
       onOpenChange={handleOpenChange}
+      scrollable={false}
       bodyClassName="flex min-h-0 flex-1 flex-col p-0"
     >
       <div className="flex min-h-0 flex-1 flex-col">
         {loading && <AddStickersLoadingState />}
 
         {!loading && mode === "capture" && (
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5 pt-4">
-            <div className="text-center">
-              <Badge variant="secondary" className="mb-3 rounded-sm">
-                {t(locale, "addStickers.badge")}
-              </Badge>
-              <DrawerTitle className="text-lg font-semibold">
-                {t(locale, "addStickers.title")}
-              </DrawerTitle>
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5 pt-4">
+              <div>
+                <DrawerTitle className="text-lg font-semibold">
+                  {t(locale, "addStickers.review.heading")}
+                </DrawerTitle>
               <DrawerDescription className="mt-1 text-sm text-muted-foreground">
                 {t(locale, "addStickers.description")}
               </DrawerDescription>
@@ -304,7 +302,7 @@ export function AddStickersDrawer({
 
         {!loading && mode === "review" && (
           <>
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5 pt-4">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5 pt-4">
               <div>
                 <DrawerTitle className="text-lg font-semibold">
                   {t(locale, "addStickers.review.heading")}

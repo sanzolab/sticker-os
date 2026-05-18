@@ -77,7 +77,7 @@ export function StatsDrawer({
     <AppDrawer
       open={open}
       onOpenChange={onOpenChange}
-      bodyClassName="space-y-5 overflow-y-auto px-5 pb-5 pt-4"
+      bodyClassName="space-y-5"
     >
       <div>
         <DrawerTitle className="text-lg font-semibold">

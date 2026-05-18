@@ -5,6 +5,7 @@ export type Locale = (typeof supportedLocales)[number];
 const translations = {
   en: {
     "common.cancel": "Cancel",
+    "common.clearSearch": "Clear search",
     "common.confirm": "Confirm",
     "common.share": "Share",
     "common.copyTxt": "Copy TXT",
@@ -253,6 +254,7 @@ const translations = {
   },
   es: {
     "common.cancel": "Cancelar",
+    "common.clearSearch": "Limpiar búsqueda",
     "common.confirm": "Confirmar",
     "common.share": "Compartir",
     "common.copyTxt": "Copiar TXT",

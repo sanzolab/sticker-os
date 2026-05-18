@@ -67,7 +67,7 @@ export function TopBar({
   return (
     <header
       ref={headerRef}
-      className="fixed inset-x-0 top-0 z-40 bg-background"
+      className="safe-top fixed inset-x-0 top-0 z-40 bg-background"
       style={headerStyle}
     >
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -119,7 +119,7 @@ export function TopBar({
         </div>
       </div>
       {shareState !== "idle" && (
-        <div className="absolute right-14 top-12 rounded-sm border bg-card px-2.5 py-1 text-xs text-muted-foreground">
+        <div className="absolute right-14 top-full mt-2 rounded-sm border bg-card px-2.5 py-1 text-xs text-muted-foreground">
           {shareState === "copied"
             ? t(locale, "topbar.shareStatus.copied")
             : t(locale, "topbar.shareStatus.downloaded")}

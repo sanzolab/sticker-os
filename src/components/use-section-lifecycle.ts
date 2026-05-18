@@ -29,12 +29,7 @@ export function useSectionLifecycle(
   );
 
   useEffect(() => {
-    if (!enabled) {
-      // Synchronize React state with external registry lifecycle when disabled.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPhaseState("placeholder");
-      return;
-    }
+    if (!enabled) return;
     const node = ref.current;
     if (!node) return;
     const registry = externalRegistry ?? getSectionLifecycleRegistry();

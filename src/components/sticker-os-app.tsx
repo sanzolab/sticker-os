@@ -198,7 +198,7 @@ export function StickerOSApp() {
           onSettings={handleSettingsOpen}
         />
       </div>
-      <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-[4.75rem] sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-8 sm:px-6 lg:px-8" style={{ paddingTop: "calc(var(--top-bar-height) + 1.25rem)" }}>
         <section className="mb-8 divide-y rounded-sm border">
           <CollectionHeader stats={stats} onViewMore={handleStatsOpen} />
         </section>

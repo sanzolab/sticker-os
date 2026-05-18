@@ -14,7 +14,7 @@ export const DrawerContent = forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mx-auto mt-24 flex max-h-[92dvh] max-w-2xl flex-col rounded-t-sm border bg-card outline-none safe-bottom",
+        "fixed inset-x-0 bottom-0 z-50 mx-auto mt-24 flex max-h-[90dvh] max-w-2xl flex-col rounded-t-sm border bg-card outline-none safe-bottom",
         className,
       )}
       {...props}
