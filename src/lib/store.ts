@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { starterCollection, stickerGroups, stickers } from "@/lib/sticker-data";
-import type { Density } from "@/lib/density";
 import type { Locale } from "@/lib/i18n";
 import {
   applyTradeToCollection,
@@ -15,8 +14,8 @@ import {
 export type ThemePreference = "system" | "light" | "dark";
 
 export type Settings = {
-  density: Density;
   animations: boolean;
+  haptics: boolean;
   theme: ThemePreference;
   locale: Locale;
 };
@@ -24,8 +23,8 @@ export type Settings = {
 const STORAGE_KEY = "stickeros-collection-v1";
 
 const defaultSettings: Settings = {
-  density: "compact",
   animations: true,
+  haptics: true,
   theme: "system",
   locale: "en",
 };

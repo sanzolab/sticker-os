@@ -207,7 +207,7 @@ input {
 .speed-dial-actions {
   position: absolute;
   bottom: calc(100% + 0.75rem);
-  right: 0;
+  right: 2px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -217,8 +217,8 @@ input {
 /* Pseudo-element idle pulse ring on the main FAB button */
 .speed-dial-fab {
   position: relative;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
   background: var(--primary);
   color: var(--primary-foreground);
@@ -245,7 +245,7 @@ input {
   border-radius: 50%;
   border: 1.5px solid var(--primary);
   opacity: 0.35;
-  animation: fab-pulse-ring 2.5s ease-out infinite;
+  animation: fab-pulse-ring 2.5s ease-out  1 forwards;
   pointer-events: none;
 }
 
@@ -274,11 +274,11 @@ input {
 /* FAB action item (circular icon button) */
 .speed-dial-action {
   position: relative;
-  width: 3rem;
-  height: 3rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
-  background: var(--card);
-  color: var(--foreground);
+  background: white;
+  color: var(--background);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -299,7 +299,7 @@ input {
 /* Closed state */
 .speed-dial-action.closed {
   opacity: 0;
-  transform: translateY(0.5rem) scale(0.8);
+  transform: translateY(0.5rem) scale(0);
   pointer-events: none;
   transition:
     transform 150ms ease-in,
@@ -331,9 +331,9 @@ input {
   color: var(--foreground);
   background: var(--card);
   padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+  /* border-radius: 0.375rem;
+  border: 1px solid var(--border); */
+  /* box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1); */
   pointer-events: none;
   opacity: 0;
   transition: opacity 200ms ease;

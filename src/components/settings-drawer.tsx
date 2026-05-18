@@ -115,16 +115,16 @@ export function SettingsDrawer({
         />
         <div className="space-y-4">
           <SettingRow
-            title={t(locale, "settings.compactGrid.title")}
-            description={t(locale, "settings.compactGrid.description")}
-            checked={settings.compactMode}
-            onChange={(checked) => updateSetting("compactMode", checked)}
-          />
-          <SettingRow
             title={t(locale, "settings.animations.title")}
             description={t(locale, "settings.animations.description")}
             checked={settings.animations}
             onChange={(checked) => updateSetting("animations", checked)}
+          />
+          <SettingRow
+            title={t(locale, "settings.haptics.title")}
+            description={t(locale, "settings.haptics.description")}
+            checked={settings.haptics}
+            onChange={(checked) => updateSetting("haptics", checked)}
           />
         </div>
         <div className="space-y-2 border-t pt-4">

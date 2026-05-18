@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { stickersById } from "@/lib/sticker-data";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
@@ -37,28 +37,28 @@ export function TradeStickerCard({
     >
       <span
         className={cn(
-          "relative flex aspect-[3/4.35] flex-col items-center justify-center rounded-sm border text-center font-medium",
+          "relative flex aspect-[3/4] flex-col items-center justify-center rounded-sm border text-center font-medium",
           "transition-[background-color,border-color,color,transform]",
           animations && "active:scale-[0.97]",
           selected
-            ? "border-primary/35 bg-primary/20 text-foreground"
-            : "border-dashed border-border/70 bg-background text-muted-foreground/70",
+            ? "border-border/50 bg-primary/[0.06] text-foreground"
+            : "border-dashed border-muted/30 bg-transparent text-muted-foreground/40",
         )}
       >
         {selected && (
-          <span className="absolute left-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Check className="size-3" />
+          <span className="absolute left-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Check className="size-2.5" />
           </span>
         )}
         {sticker.special && (
-          <span className="absolute right-2 top-2 text-sm text-yellow-400">
-            ✨
-          </span>
+          <Sparkles className="absolute right-1 top-1 size-3 text-amber-500" />
         )}
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           {prefix}
         </span>
-        <span className="text-2xl">{sticker.number}</span>
+        <span className="text-lg font-semibold tabular-nums">
+          {sticker.number}
+        </span>
       </span>
     </button>
   );

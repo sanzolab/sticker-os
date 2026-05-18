@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { memo, useCallback, useEffect, useState } from "react";
-import { StickerCard } from "@/components/sticker-card";
+import { StickerCell } from "@/components/sticker-cell";
 import { useSectionLifecycle } from "@/components/use-section-lifecycle";
 import { getSectionLifecycleRegistry } from "@/lib/section-lifecycle";
 import { t } from "@/lib/i18n";
@@ -54,7 +54,7 @@ export const StickerSection = memo(function StickerSection({
   }, [phase]);
 
   const gridClassName =
-    "grid grid-cols-4 gap-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 py-3";
+    "grid grid-cols-5 gap-2 min-[430px]:grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 py-4";
 
   const isPlaceholder = phase === "placeholder";
   const isVisible = phase === "visible";
@@ -117,7 +117,7 @@ export const StickerSection = memo(function StickerSection({
             <div className="min-h-0">
               <div className={gridClassName}>
                 {groupStickers.map((sticker) => (
-                  <StickerCard
+                  <StickerCell
                     key={sticker.id}
                     sticker={sticker}
                     onEditDuplicates={onEditDuplicates}

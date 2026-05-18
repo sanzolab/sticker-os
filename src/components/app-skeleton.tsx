@@ -81,11 +81,11 @@ export default function AppSkeleton() {
               </div>
 
               {/* GRID */}
-              <div className="grid grid-cols-4 gap-3 py-3 min-[430px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+              <div className="grid grid-cols-5 gap-4 py-4 min-[430px]:grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
                 {[...Array(10)].map((_, i) => (
                   <div
                     key={i}
-                    className="aspect-[3/4.35] rounded-sm bg-muted"
+                    className="aspect-square rounded-sm bg-muted"
                   />
                 ))}
               </div>
