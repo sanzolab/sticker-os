@@ -9,7 +9,7 @@ export type TradeMatches = {
 
 export type ApplyTradeResult =
   | { ok: true }
-  | { ok: false; reason: "stale-duplicates" | "invalid-selection" };
+  | { ok: false; reason: "stale-duplicates" | "stale-receive" | "invalid-selection" };
 
 type ApplyTradeFailure = Extract<ApplyTradeResult, { ok: false }>;
 
@@ -65,14 +65,22 @@ export function previewTradeImpact(
   receiveIds: string[],
   giveIds: string[],
 ): TradeImpactItem[] {
-  const deltas = new Map<string, number>();
+  const giveSet = new Set(giveIds);
+  const receiveSet = new Set(receiveIds);
+  const allIds = new Set([...receiveIds, ...giveIds]);
 
-  giveIds.forEach((id) => deltas.set(id, (deltas.get(id) ?? 0) - 1));
-  receiveIds.forEach((id) => deltas.set(id, (deltas.get(id) ?? 0) + 1));
-
-  return sortStickerIds([...deltas.keys()]).map((id) => {
+  return sortStickerIds([...allIds]).map((id) => {
     const before = collectionByStickerId[id] ?? 0;
-    const after = Math.max(before + (deltas.get(id) ?? 0), 0);
+    let after = before;
+
+    if (giveSet.has(id) && before > 1) {
+      after = after - 1;
+    }
+
+    if (receiveSet.has(id)) {
+      after = after + 1;
+    }
+
     return {
       id,
       code: stickersById[id]?.code ?? id,
@@ -95,18 +103,35 @@ export function canApplyTrade(
     return { ok: false, reason: "invalid-selection" };
   }
 
+  const uniqueReceiveIds = new Set(receiveIds);
   const uniqueGiveIds = new Set(giveIds);
+
+  if (uniqueReceiveIds.size !== receiveIds.length) {
+    return { ok: false, reason: "invalid-selection" };
+  }
 
   if (uniqueGiveIds.size !== giveIds.length) {
     return { ok: false, reason: "invalid-selection" };
   }
 
-  const hasStaleDuplicate = giveIds.some(
+  if (receiveIds.some((id) => uniqueGiveIds.has(id))) {
+    return { ok: false, reason: "invalid-selection" };
+  }
+
+  const hasStaleGive = giveIds.some(
     (id) => (collectionByStickerId[id] ?? 0) <= 1,
   );
 
-  if (hasStaleDuplicate) {
+  if (hasStaleGive) {
     return { ok: false, reason: "stale-duplicates" };
+  }
+
+  const hasStaleReceive = receiveIds.some(
+    (id) => (collectionByStickerId[id] ?? 0) > 0,
+  );
+
+  if (hasStaleReceive) {
+    return { ok: false, reason: "stale-receive" };
   }
 
   return { ok: true };
@@ -120,7 +145,10 @@ export function applyTradeToCollection(
   const next = { ...collectionByStickerId };
 
   giveIds.forEach((id) => {
-    next[id] = Math.max((next[id] ?? 0) - 1, 1);
+    const copies = next[id] ?? 0;
+    if (copies > 1) {
+      next[id] = copies - 1;
+    }
   });
 
   receiveIds.forEach((id) => {

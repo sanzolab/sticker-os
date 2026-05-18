@@ -99,6 +99,15 @@ input {
   font: inherit;
 }
 
+@layer base {
+  button, [role="button"], .sticker-cell, [data-animated-tab] {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
 :root {
   --safe-area-top: env(safe-area-inset-top);
   --safe-area-bottom: env(safe-area-inset-bottom);
@@ -833,5 +842,11 @@ input {
 
   .immersive-hints {
     transition: none;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hoverable:hover {
+    opacity: 0.8;
   }
 }

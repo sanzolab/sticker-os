@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { stickersById } from "@/lib/sticker-data";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
@@ -20,6 +21,8 @@ export function TradeStickerCard({
 
   if (!sticker) return null;
 
+  const prefix = sticker.code.replace(/\d+$/, "");
+
   return (
     <button
       type="button"
@@ -34,7 +37,7 @@ export function TradeStickerCard({
     >
       <span
         className={cn(
-          "relative flex aspect-[3/4.35] items-center justify-center rounded-sm border text-2xl font-medium",
+          "relative flex aspect-[3/4.35] flex-col items-center justify-center rounded-sm border text-center font-medium",
           "transition-[background-color,border-color,color,transform]",
           animations && "active:scale-[0.97]",
           selected
@@ -42,13 +45,20 @@ export function TradeStickerCard({
             : "border-dashed border-border/70 bg-background text-muted-foreground/70",
         )}
       >
-        {sticker.special && (
-          <span className="absolute right-3 top-3 text-yellow-400">✨</span>
+        {selected && (
+          <span className="absolute left-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Check className="size-3" />
+          </span>
         )}
-        <span>{sticker.number}</span>
-      </span>
-      <span className="mt-1 block truncate text-center text-[11px] text-muted-foreground">
-        {sticker.code}
+        {sticker.special && (
+          <span className="absolute right-2 top-2 text-sm text-yellow-400">
+            ✨
+          </span>
+        )}
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {prefix}
+        </span>
+        <span className="text-2xl">{sticker.number}</span>
       </span>
     </button>
   );

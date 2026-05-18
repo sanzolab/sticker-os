@@ -68,6 +68,7 @@ export function TradeScanner({
 
     return () => {
       cancelled = true;
+      scannedRef.current = false;
       scannerRef.current?.destroy();
       scannerRef.current = null;
     };

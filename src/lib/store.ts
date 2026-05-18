@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { starterCollection, stickerGroups, stickers } from "@/lib/sticker-data";
+import type { Density } from "@/lib/density";
 import type { Locale } from "@/lib/i18n";
 import {
   applyTradeToCollection,
@@ -14,7 +15,7 @@ import {
 export type ThemePreference = "system" | "light" | "dark";
 
 export type Settings = {
-  compactMode: boolean;
+  density: Density;
   animations: boolean;
   theme: ThemePreference;
   locale: Locale;
@@ -23,7 +24,7 @@ export type Settings = {
 const STORAGE_KEY = "stickeros-collection-v1";
 
 const defaultSettings: Settings = {
-  compactMode: false,
+  density: "compact",
   animations: true,
   theme: "system",
   locale: "en",
@@ -99,16 +100,19 @@ export const useStickerStore = create<StickerOSState>()(
         }),
 
       applyTrade: (receiveIds, giveIds) => {
-        let result: ApplyTradeResult = { ok: false, reason: "invalid-selection" };
+        let tradeResult: ApplyTradeResult = {
+          ok: false,
+          reason: "invalid-selection",
+        };
 
         set((state) => {
-          result = canApplyTrade(
+          tradeResult = canApplyTrade(
             state.collectionByStickerId,
             receiveIds,
             giveIds,
           );
 
-          if (!result.ok) return state;
+          if (!tradeResult.ok) return state;
 
           return {
             collectionByStickerId: applyTradeToCollection(
@@ -119,7 +123,7 @@ export const useStickerStore = create<StickerOSState>()(
           };
         });
 
-        return result;
+        return tradeResult;
       },
 
       resetCollection: () => set({ collectionByStickerId: {} }),
@@ -139,6 +143,10 @@ export const useStickerStore = create<StickerOSState>()(
         return {
           ...currentState,
           ...persisted,
+          collectionByStickerId: sanitizeCollection(
+            persisted?.collectionByStickerId,
+            currentState.collectionByStickerId,
+          ),
           settings: {
             ...defaultSettings,
             ...persisted?.settings,
@@ -157,6 +165,35 @@ export const useStickerStore = create<StickerOSState>()(
 // ✅ Hook optimizado por sticker (gran mejora de performance)
 export function useStickerCopies(id: string) {
   return useStickerStore((state) => state.collectionByStickerId[id] ?? 0);
+}
+
+const MAX_STICKER_COPIES = 999;
+
+function sanitizeCollection(
+  persisted: unknown,
+  fallback: Record<string, number>,
+): Record<string, number> {
+  if (!persisted || typeof persisted !== "object" || Array.isArray(persisted)) {
+    return fallback;
+  }
+
+  const sanitized: Record<string, number> = {};
+
+  for (const [key, value] of Object.entries(
+    persisted as Record<string, unknown>,
+  )) {
+    if (
+      typeof value === "number" &&
+      Number.isFinite(value) &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value <= MAX_STICKER_COPIES
+    ) {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
 }
 
 // ✅ Stats estables (SIN loops)

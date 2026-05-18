@@ -144,6 +144,9 @@ const translations = {
       "Your duplicates changed. Review this trade before trying again.",
     "trade.error.invalidSelection":
       "Select at least one sticker to receive and one to give.",
+    "trade.error.staleReceive":
+      "One or more stickers you want to receive are no longer missing. Re-scan to get updated matches.",
+    "trade.myQr.title": "My Trade QR",
     "addStickers.badge": "Quick capture",
     "addStickers.title": "Add stickers",
     "addStickers.description":
@@ -396,6 +399,9 @@ const translations = {
       "Tus repetidas cambiaron. Revisa este intercambio antes de intentarlo de nuevo.",
     "trade.error.invalidSelection":
       "Selecciona al menos una figurita para recibir y una para dar.",
+    "trade.error.staleReceive":
+      "Una o más figuritas que quieres recibir ya las tienes. Vuelve a escanear para obtener coincidencias actualizadas.",
+    "trade.myQr.title": "Mi QR de intercambio",
     "addStickers.badge": "Captura rápida",
     "addStickers.title": "Agregar figuritas",
     "addStickers.description":

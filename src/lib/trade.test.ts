@@ -5,6 +5,7 @@ import {
   applyValidatedTradeToCollection,
   buildTradeMatches,
   canApplyTrade,
+  previewTradeImpact,
 } from "@/lib/trade";
 
 const [first, second, third, fourth] = stickers;
@@ -86,9 +87,9 @@ describe("trade application", () => {
 
   it("applies valid trades all at once", () => {
     const result = applyValidatedTradeToCollection(
-      { [first.id]: 2, [second.id]: 0, [third.id]: 1 },
-      [second.id, third.id],
-      [first.id],
+      { [first.id]: 2, [second.id]: 0, [third.id]: 3, [fourth.id]: 0 },
+      [second.id, fourth.id],
+      [first.id, third.id],
     );
 
     expect(result.ok).toBe(true);
@@ -97,6 +98,7 @@ describe("trade application", () => {
     expect(result.collectionByStickerId[first.id]).toBe(1);
     expect(result.collectionByStickerId[second.id]).toBe(1);
     expect(result.collectionByStickerId[third.id]).toBe(2);
+    expect(result.collectionByStickerId[fourth.id]).toBe(1);
   });
 
   it("rejects invalid empty selections", () => {
@@ -104,5 +106,95 @@ describe("trade application", () => {
       ok: false,
       reason: "invalid-selection",
     });
+  });
+
+  it("rejects duplicate receive IDs", () => {
+    expect(
+      canApplyTrade(
+        { [first.id]: 2, [second.id]: 0 },
+        [second.id, second.id],
+        [first.id],
+      ),
+    ).toEqual({ ok: false, reason: "invalid-selection" });
+  });
+
+  it("rejects overlapping receive and give IDs", () => {
+    expect(
+      canApplyTrade(
+        { [first.id]: 2, [second.id]: 0 },
+        [second.id, first.id],
+        [first.id, third.id],
+      ),
+    ).toEqual({ ok: false, reason: "invalid-selection" });
+  });
+
+  it("rejects a stale receive sticker the user already owns", () => {
+    const collection = { [first.id]: 2, [second.id]: 1 };
+
+    expect(canApplyTrade(collection, [second.id], [first.id])).toEqual({
+      ok: false,
+      reason: "stale-receive",
+    });
+  });
+
+  it("does not decrement a give sticker with only 1 copy", () => {
+    const next = applyTradeToCollection(
+      { [first.id]: 1, [second.id]: 0 },
+      [second.id],
+      [first.id],
+    );
+
+    expect(next[first.id]).toBe(1);
+  });
+
+  it("does not create copies from a missing give sticker", () => {
+    const next = applyTradeToCollection(
+      { [first.id]: 0, [second.id]: 0 },
+      [second.id],
+      [first.id],
+    );
+
+    expect(next[first.id]).toBe(0);
+  });
+});
+
+describe("previewTradeImpact", () => {
+  it("shows give sticker decremented from 2 to 1", () => {
+    const impact = previewTradeImpact(
+      { [first.id]: 2, [second.id]: 0 },
+      [second.id],
+      [first.id],
+    );
+
+    expect(impact).toEqual([
+      { id: first.id, code: first.code, before: 2, after: 1 },
+      { id: second.id, code: second.code, before: 0, after: 1 },
+    ]);
+  });
+
+  it("shows give sticker unchanged when only 1 copy", () => {
+    const impact = previewTradeImpact(
+      { [first.id]: 1, [second.id]: 0 },
+      [second.id],
+      [first.id],
+    );
+
+    expect(impact).toEqual([
+      { id: first.id, code: first.code, before: 1, after: 1 },
+      { id: second.id, code: second.code, before: 0, after: 1 },
+    ]);
+  });
+
+  it("matches applyTradeToCollection output exactly", () => {
+    const collection = { [first.id]: 2, [second.id]: 0, [third.id]: 1 };
+    const receiveIds = [second.id, third.id];
+    const giveIds = [first.id];
+
+    const impact = previewTradeImpact(collection, receiveIds, giveIds);
+    const next = applyTradeToCollection(collection, receiveIds, giveIds);
+
+    for (const item of impact) {
+      expect(next[item.id]).toBe(item.after);
+    }
   });
 });
