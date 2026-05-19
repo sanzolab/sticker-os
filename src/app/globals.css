@@ -73,19 +73,23 @@
   --ring: oklch(0.66 0.19 258);
 }
 
-* {
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
   border-color: var(--border);
 }
 
 html {
+  box-sizing: border-box;
   min-height: 100dvh;
-  background: var(--background);
+  background-color: var(--background);
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
   min-height: 100dvh;
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
 }
