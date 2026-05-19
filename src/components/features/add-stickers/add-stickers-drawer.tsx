@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { analyzeVoiceSubmission } from "@/lib/voice-submit";

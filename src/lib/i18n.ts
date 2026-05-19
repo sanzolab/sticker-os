@@ -20,6 +20,9 @@ const translations = {
     "topbar.addStickersAria": "Add stickers",
     "topbar.shareAria": "Open share options",
     "topbar.tradeAria": "Open sticker trade",
+    "topbar.tradeBadge.pendingCount": "Pending trade: {count} selected",
+    "topbar.tradeBadge.pendingNeedsSelection":
+      "Pending trade: selection needed",
     "topbar.settingsAria": "Open settings",
     "topbar.shareStatus.copied": "Copied",
     "topbar.shareStatus.downloaded": "Downloaded",
@@ -120,10 +123,16 @@ const translations = {
     "trade.section.receive.detail": "{name} has {count} stickers you need.",
     "trade.section.give.title": "What you can give ({count})",
     "trade.section.give.detail": "You have {count} stickers {name} needs.",
+    "trade.section.selectAll": "All",
+    "trade.section.clear": "Clear",
     "trade.confirm.label": "Confirm Trade ({receive} for {give})",
     "trade.confirm.dialogTitle": "Confirm Trade?",
     "trade.confirm.dialogDescription":
       "Review the sticker count changes before updating your album.",
+    "trade.exit.dialogTitle": "Discard this trade?",
+    "trade.exit.dialogDescription":
+      "Your scanned exchange and current selections will be lost.",
+    "trade.exit.dialogConfirm": "Discard Trade",
     "trade.summary.receive": "You'll receive",
     "trade.summary.give": "You'll give",
     "trade.albumImpact": "Album impact",
@@ -272,6 +281,10 @@ const translations = {
     "topbar.addStickersAria": "Agregar figuritas",
     "topbar.shareAria": "Abrir opciones para compartir",
     "topbar.tradeAria": "Abrir intercambio de figuritas",
+    "topbar.tradeBadge.pendingCount":
+      "Intercambio pendiente: {count} seleccionadas",
+    "topbar.tradeBadge.pendingNeedsSelection":
+      "Intercambio pendiente: faltan selecciones",
     "topbar.settingsAria": "Abrir ajustes",
     "topbar.shareStatus.copied": "Copiado",
     "topbar.shareStatus.downloaded": "Descargado",
@@ -374,10 +387,16 @@ const translations = {
     "trade.section.receive.detail": "{name} tiene {count} figuritas que necesitas.",
     "trade.section.give.title": "Lo que puedes dar ({count})",
     "trade.section.give.detail": "Tienes {count} figuritas que {name} necesita.",
+    "trade.section.selectAll": "Todas",
+    "trade.section.clear": "Limpiar",
     "trade.confirm.label": "Confirmar intercambio ({receive} por {give})",
     "trade.confirm.dialogTitle": "¿Confirmar intercambio?",
     "trade.confirm.dialogDescription":
       "Revisa los cambios en la cantidad de figuritas antes de actualizar tu álbum.",
+    "trade.exit.dialogTitle": "¿Descartar este intercambio?",
+    "trade.exit.dialogDescription":
+      "Se perderán el intercambio escaneado y las selecciones actuales.",
+    "trade.exit.dialogConfirm": "Descartar intercambio",
     "trade.summary.receive": "Recibirás",
     "trade.summary.give": "Darás",
     "trade.albumImpact": "Impacto en el álbum",

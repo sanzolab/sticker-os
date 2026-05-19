@@ -17,6 +17,8 @@ import { useElementHeight } from "@/hooks/use-element-height";
 import { useAssistantStore } from "@/lib/assistant-store";
 import { usePageScrollVisibility, useRegisterStickyActivation } from "@/lib/scroll-visibility";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
+import { useTradeSessionStore } from "@/lib/trade-session";
+import { getTradeBadgeValue } from "@/lib/trade-badge";
 import { useAddStickersPendingStore } from "@/components/features/add-stickers/add-stickers-session";
 import type { Sticker } from "@/lib/sticker-data";
 
@@ -54,6 +56,13 @@ export function StickerOSApp() {
   const { isStickyActive, tabsProgress, headerProgress } = usePageScrollVisibility();
   const pendingAddStickersCount = useAddStickersPendingStore(
     (state) => state.candidates.length,
+  );
+  const tradeBadgeValue = useTradeSessionStore((state) =>
+    getTradeBadgeValue(
+      state.result,
+      state.selectedReceiveIds,
+      state.selectedGiveIds,
+    ),
   );
   const addStickersOpen = useAssistantStore((s) => s.addStickersOpen);
   const setAddStickersOpen = useAssistantStore((s) => s.setAddStickersOpen);
@@ -190,6 +199,7 @@ export function StickerOSApp() {
           collectionName={collectionName}
           shareState={shareState}
           pendingAddStickersCount={pendingAddStickersCount}
+          tradeBadgeValue={tradeBadgeValue}
           hiddenProgress={headerProgress}
           isStickyActive={isStickyActive}
           onShare={handleShareOpen}

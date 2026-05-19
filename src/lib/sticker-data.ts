@@ -12,6 +12,12 @@ export type StickerKind =
   | "player";
 export type StickerVisualState = "missing" | "owned" | "duplicate" | "special";
 
+export type CompactStickerLabel = {
+  primary: string;
+  secondary: string;
+  detail: string;
+};
+
 export type StickerGroup = {
   id: string;
   label: string;
@@ -480,6 +486,57 @@ const countryGroups: StickerGroup[] = [
   },
 ];
 
+const countryDisplayNames: Record<string, Partial<Record<Locale, string>>> = {
+  MEX: { en: "Mexico", es: "México" },
+  RSA: { en: "South Africa", es: "Sudáfrica" },
+  KOR: { en: "South Korea", es: "Corea del Sur" },
+  CZE: { en: "Czechia", es: "Chequia" },
+  CAN: { en: "Canada", es: "Canadá" },
+  BIH: { en: "Bosnia and Herzegovina", es: "Bosnia y Herzegovina" },
+  QAT: { en: "Qatar", es: "Catar" },
+  SUI: { en: "Switzerland", es: "Suiza" },
+  BRA: { en: "Brazil", es: "Brasil" },
+  MAR: { en: "Morocco", es: "Marruecos" },
+  HAI: { en: "Haiti", es: "Haití" },
+  SCO: { en: "Scotland", es: "Escocia" },
+  USA: { en: "United States", es: "Estados Unidos" },
+  PAR: { en: "Paraguay", es: "Paraguay" },
+  AUS: { en: "Australia", es: "Australia" },
+  TUR: { en: "Turkey", es: "Turquía" },
+  GER: { en: "Germany", es: "Alemania" },
+  CUW: { en: "Curacao", es: "Curazao" },
+  CIV: { en: "Cote d'Ivoire", es: "Costa de Marfil" },
+  ECU: { en: "Ecuador", es: "Ecuador" },
+  NED: { en: "Netherlands", es: "Países Bajos" },
+  JPN: { en: "Japan", es: "Japón" },
+  SWE: { en: "Sweden", es: "Suecia" },
+  TUN: { en: "Tunisia", es: "Túnez" },
+  BEL: { en: "Belgium", es: "Bélgica" },
+  EGY: { en: "Egypt", es: "Egipto" },
+  IRN: { en: "Iran", es: "Irán" },
+  NZL: { en: "New Zealand", es: "Nueva Zelanda" },
+  ESP: { en: "Spain", es: "España" },
+  CPV: { en: "Cape Verde", es: "Cabo Verde" },
+  KSA: { en: "Saudi Arabia", es: "Arabia Saudita" },
+  URU: { en: "Uruguay", es: "Uruguay" },
+  FRA: { en: "France", es: "Francia" },
+  SEN: { en: "Senegal", es: "Senegal" },
+  IRQ: { en: "Iraq", es: "Irak" },
+  NOR: { en: "Norway", es: "Noruega" },
+  ARG: { en: "Argentina", es: "Argentina" },
+  ALG: { en: "Algeria", es: "Argelia" },
+  AUT: { en: "Austria", es: "Austria" },
+  JOR: { en: "Jordan", es: "Jordania" },
+  POR: { en: "Portugal", es: "Portugal" },
+  COD: { en: "DR Congo", es: "RD Congo" },
+  UZB: { en: "Uzbekistan", es: "Uzbekistán" },
+  COL: { en: "Colombia", es: "Colombia" },
+  ENG: { en: "England", es: "Inglaterra" },
+  CRO: { en: "Croatia", es: "Croacia" },
+  GHA: { en: "Ghana", es: "Ghana" },
+  PAN: { en: "Panama", es: "Panamá" },
+};
+
 export const stickerGroups = [...fwcGroups, ...countryGroups, ...ccGroups];
 export const sectionOrder = stickerGroups.map((group) => group.id);
 export const stickerGroupsById = Object.fromEntries(
@@ -526,6 +583,38 @@ export function getStickerGroupLabelById(groupId: string, locale: Locale) {
   const group = stickerGroupsById[groupId];
 
   return group ? getStickerGroupLabel(group, locale) : groupId;
+}
+
+export function getCompactStickerLabel(
+  sticker: Sticker,
+  locale: Locale,
+): CompactStickerLabel {
+  if (sticker.category === "fwc") {
+    return {
+      primary: "FWC",
+      secondary: sticker.number,
+      detail: getCompactGroupDetail(getStickerGroupLabelById(sticker.groupId, locale), "FWC"),
+    };
+  }
+
+  if (sticker.category === "cc") {
+    return {
+      primary: "CC",
+      secondary: sticker.number,
+      detail: getCompactGroupDetail(getStickerGroupLabelById(sticker.groupId, locale), "CC"),
+    };
+  }
+
+  const code = sticker.countryCode ?? sticker.groupId.toUpperCase();
+
+  return {
+    primary: code,
+    secondary: sticker.number,
+    detail: getCountryDisplayName(code, locale) ?? getCompactGroupDetail(
+      getStickerGroupLabelById(sticker.groupId, locale),
+      code,
+    ),
+  };
 }
 
 export function getStickerSearchValues(sticker: Sticker, locale: Locale) {
@@ -676,4 +765,30 @@ export function getGroupedStickers(items = stickers) {
 
 function getStickerOsIndex(code: string) {
   return stickerToIndex(code);
+}
+
+function getCountryDisplayName(code: string, locale: Locale) {
+  const names = countryDisplayNames[code];
+
+  return names?.[locale] ?? names?.en;
+}
+
+function getCompactGroupDetail(label: string, code: string) {
+  const withoutEmoji = label.replace(/\p{Extended_Pictographic}/gu, "");
+  const withoutCode = withoutEmoji
+    .replace(new RegExp(`^${escapeRegExp(code)}\\s*-?\\s*`, "i"), "")
+    .trim();
+  const compact = withoutCode || label.replace(/\p{Extended_Pictographic}/gu, "").trim();
+
+  return toTitleCase(compact);
+}
+
+function toTitleCase(value: string) {
+  return value
+    .toLocaleLowerCase()
+    .replace(/\b[\p{L}]/gu, (letter) => letter.toLocaleUpperCase());
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

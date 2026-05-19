@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { stickers, stickersByStickerOsIndex } from "@/lib/sticker-data";
 import { useStickerStore } from "@/lib/store";
+import { useTradeSessionStore } from "@/lib/trade-session";
 import {
   buildTradeMatches,
   getLocalDuplicateIds,
@@ -32,12 +33,6 @@ import { SummaryList } from "./summary-list";
 
 type TradeStep = "entry" | "scan" | "result";
 
-type TradeResult = {
-  remoteName: string;
-  receiveIds: string[];
-  giveIds: string[];
-};
-
 export function TradeDrawer({
   open,
   onOpenChange,
@@ -48,11 +43,9 @@ export function TradeDrawer({
   const [step, setStep] = useState<TradeStep>("entry");
   const [scanErrorKey, setScanErrorKey] = useState<TradeMessageKey | null>(null);
   const [applyErrorKey, setApplyErrorKey] = useState<TradeMessageKey | null>(null);
-  const [result, setResult] = useState<TradeResult | null>(null);
   const [qrValue, setQrValue] = useState("");
-  const [selectedReceiveIds, setSelectedReceiveIds] = useState<string[]>([]);
-  const [selectedGiveIds, setSelectedGiveIds] = useState<string[]>([]);
   const [showMyQr, setShowMyQr] = useState(false);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const scanAbortRef = useRef<AbortController | null>(null);
 
   const locale = useStickerStore((state) => state.settings.locale);
@@ -61,6 +54,23 @@ export function TradeDrawer({
     (state) => state.collectionByStickerId,
   );
   const applyTrade = useStickerStore((state) => state.applyTrade);
+  const result = useTradeSessionStore((state) => state.result);
+  const selectedReceiveIds = useTradeSessionStore(
+    (state) => state.selectedReceiveIds,
+  );
+  const selectedGiveIds = useTradeSessionStore(
+    (state) => state.selectedGiveIds,
+  );
+  const setTradeResult = useTradeSessionStore((state) => state.setResult);
+  const toggleReceiveId = useTradeSessionStore((state) => state.toggleReceiveId);
+  const toggleGiveId = useTradeSessionStore((state) => state.toggleGiveId);
+  const toggleAllReceiveIds = useTradeSessionStore(
+    (state) => state.toggleAllReceiveIds,
+  );
+  const toggleAllGiveIds = useTradeSessionStore(
+    (state) => state.toggleAllGiveIds,
+  );
+  const clearTradeSession = useTradeSessionStore((state) => state.clearSession);
 
   const displayName = sanitizeTradeDisplayName(collectionName);
   const stickerOsIndexes = useMemo(
@@ -88,18 +98,11 @@ export function TradeDrawer({
     return () => controller.abort();
   }, [stickerOsIndexes]);
 
-  const resetFlow = useCallback(() => {
-    setStep("entry");
-    setScanErrorKey(null);
-    setApplyErrorKey(null);
-    setResult(null);
-    setSelectedReceiveIds([]);
-    setSelectedGiveIds([]);
-    setShowMyQr(false);
-  }, []);
-
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) resetFlow();
+    if (!nextOpen) {
+      setShowMyQr(false);
+      setExitDialogOpen(false);
+    }
     onOpenChange(nextOpen);
   };
 
@@ -129,28 +132,38 @@ export function TradeDrawer({
         remoteDuplicateIds: parsed.duplicateIds,
       });
 
-      setResult({
+      setTradeResult({
         remoteName: parsed.name || "",
         receiveIds: matches.receiveIds,
         giveIds: matches.giveIds,
       });
-      setSelectedReceiveIds([]);
-      setSelectedGiveIds([]);
       setScanErrorKey(null);
       setApplyErrorKey(null);
       setStep("result");
     },
-    [collectionByStickerId],
+    [collectionByStickerId, setTradeResult],
   );
 
   const toggleReceive = (id: string) => {
     setApplyErrorKey(null);
-    setSelectedReceiveIds((ids) => toggleId(ids, id));
+    toggleReceiveId(id);
   };
 
   const toggleGive = (id: string) => {
     setApplyErrorKey(null);
-    setSelectedGiveIds((ids) => toggleId(ids, id));
+    toggleGiveId(id);
+  };
+
+  const toggleAllReceive = () => {
+    if (!result) return;
+    setApplyErrorKey(null);
+    toggleAllReceiveIds(result.receiveIds);
+  };
+
+  const toggleAllGive = () => {
+    if (!result) return;
+    setApplyErrorKey(null);
+    toggleAllGiveIds(result.giveIds);
   };
 
   const impact = useMemo(
@@ -171,6 +184,7 @@ export function TradeDrawer({
     give: selectedGiveIds.length,
   });
   const remoteName = result?.remoteName || t(locale, "trade.collectorFallback");
+  const activeStep = result ? "result" : step;
 
   const confirmTrade = () => {
     const tradeResult = applyTrade(selectedReceiveIds, selectedGiveIds);
@@ -186,7 +200,17 @@ export function TradeDrawer({
       return;
     }
 
+    clearTradeSession();
+    setStep("entry");
     handleOpenChange(false);
+  };
+
+  const discardTrade = () => {
+    clearTradeSession();
+    setApplyErrorKey(null);
+    setScanErrorKey(null);
+    setExitDialogOpen(false);
+    setStep("entry");
   };
 
   return (
@@ -197,7 +221,7 @@ export function TradeDrawer({
       bodyClassName="flex min-h-0 flex-1 flex-col p-0"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        {step === "entry" && (
+        {activeStep === "entry" && (
           <div className="space-y-5 px-5 pb-5 pt-4 text-center">
             <div>
               <Badge variant="secondary" className="mb-3 rounded-sm">
@@ -254,7 +278,7 @@ export function TradeDrawer({
           </div>
         )}
 
-        {step === "scan" && (
+        {activeStep === "scan" && (
           <div className="space-y-5 px-5 pb-5 pt-4">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
@@ -296,10 +320,20 @@ export function TradeDrawer({
           </div>
         )}
 
-        {step === "result" && result && (
+        {activeStep === "result" && result && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5 pt-4">
               <div className="flex items-start gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 -ml-2"
+                  onClick={() => setExitDialogOpen(true)}
+                  aria-label={t(locale, "trade.exit.dialogTitle")}
+                >
+                  <ArrowLeft className="size-5" />
+                </Button>
                 <div className="min-w-0 flex-1">
                   <DrawerHeader
                     title={t(locale, "trade.comparison.title")}
@@ -339,6 +373,7 @@ export function TradeDrawer({
                     stickerIds={result.receiveIds}
                     selectedIds={selectedReceiveIds}
                     onToggle={toggleReceive}
+                    onToggleAll={toggleAllReceive}
                   />
                   <TradeSection
                     title={t(locale, "trade.section.give.title", {
@@ -351,6 +386,7 @@ export function TradeDrawer({
                     stickerIds={result.giveIds}
                     selectedIds={selectedGiveIds}
                     onToggle={toggleGive}
+                    onToggleAll={toggleAllGive}
                   />
                 </>
               )}
@@ -369,7 +405,10 @@ export function TradeDrawer({
                   variant="secondary"
                   size="pill"
                   className="w-full shadow-none"
-                  onClick={() => setStep("scan")}
+                  onClick={() => {
+                    clearTradeSession();
+                    setStep("scan");
+                  }}
                 >
                   {t(locale, "trade.scanAnother")}
                 </Button>
@@ -514,14 +553,38 @@ export function TradeDrawer({
           </>
         )}
       </AnimatePresence>
+
+      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(locale, "trade.exit.dialogTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(locale, "trade.exit.dialogDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button type="button" variant="outline" className="shadow-none">
+                {t(locale, "common.cancel")}
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                className="shadow-none"
+                onClick={discardTrade}
+              >
+                {t(locale, "trade.exit.dialogConfirm")}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppDrawer>
   );
-}
-
-function toggleId(ids: string[], id: string) {
-  return ids.includes(id)
-    ? ids.filter((candidate) => candidate !== id)
-    : [...ids, id];
 }
 
 type StickerOsIndexes = {

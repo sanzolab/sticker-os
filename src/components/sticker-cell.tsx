@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef } from "react";
+import { SpecialStickerMark } from "@/components/special-sticker-mark";
 import { haptic } from "@/lib/haptic";
 import { getVisualStateFromCopies } from "@/lib/getVisualStateFromCopies";
 import { Sticker } from "@/lib/sticker-data";
@@ -78,7 +79,7 @@ export const StickerCell = memo(function StickerCell({
           !sticker.special && state === "owned" &&
             "rounded-sm border border-border/50 bg-primary/[0.06] text-foreground",
           sticker.special && state === "missing" &&
-            "rounded-sm border border-dashed border-amber-500/20! bg-transparent text-muted-foreground/40",
+            "rounded-sm border border-dashed border-amber-500/30! bg-transparent text-muted-foreground/40",
           sticker.special && state === "owned" &&
             "rounded-sm border  border-amber-400/40! bg-amber-950/20 text-amber-300",
         )}
@@ -101,10 +102,7 @@ export const StickerCell = memo(function StickerCell({
         <span className="absolute bottom-[6px] md:bottom-2 size-1.5 rounded-full border" />
       )}
       {state === "missing" && sticker.special && (
-        
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute bottom-[6px] md:bottom-1.5 size-2.5 text-amber-500/20">
-          <path d="M12.983 21.186a1 1 0 0 1-1.966 0 10 10 0 0 0-8.203-8.203 1 1 0 0 1 0-1.966 10 10 0 0 0 8.203-8.203 1 1 0 0 1 1.966 0 10 10 0 0 0 8.203 8.203 1 1 0 0 1 0 1.966 10 10 0 0 0-8.203 8.203"/>
-        </svg>
+        <SpecialStickerMark className="absolute bottom-[6px] md:bottom-1.5 size-2.5" />
       )}
 
       {copies > 1 && (
