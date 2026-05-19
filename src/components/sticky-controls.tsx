@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { t, type TranslationKey } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
-export type AlbumTab = "all" | "missing" | "duplicates" | "special";
+export type AlbumTab = "all" | "missing" | "duplicates" | "special" | "collected";
 
 export const albumTabs = [
   { id: "all", labelKey: "album.tab.all" },

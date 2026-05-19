@@ -20,14 +20,15 @@ export const metadata: Metadata = {
   description: "A mobile-first FIFA World Cup 2026 sticker collector app.",
   applicationName: "StickerOS",
   manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "StickerOS",
-  },
   icons: {
     icon: "/icon.svg",
     apple: "/apple-icon.svg",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+    "apple-mobile-web-app-title": "StickerOS",
   },
 };
 

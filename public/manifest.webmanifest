@@ -4,9 +4,10 @@
   "description": "Track FIFA World Cup 2026 stickers with a local-first collector app.",
   "start_url": "/",
   "scope": "/",
-  "display": "fullscreen",
-  "background_color": "#f7f8fb",
-  "theme_color": "#f7f8fb",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#151820",
+  "theme_color": "#151820",
   "orientation": "portrait",
   "icons": [
     {

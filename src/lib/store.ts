@@ -57,6 +57,7 @@ type StickerOSState = {
   tapSticker: (id: string) => void;
   removeSticker: (id: string) => void;
   setStickerCopies: (id: string, copies: number) => void;
+  setCollectionByStickerId: (collectionByStickerId: Record<string, number>) => void;
   applyTrade: (receiveIds: string[], giveIds: string[]) => ApplyTradeResult;
   resetCollection: () => void;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
@@ -97,6 +98,14 @@ export const useStickerStore = create<StickerOSState>()(
           else next[id] = copies;
           return { collectionByStickerId: next };
         }),
+
+      setCollectionByStickerId: (collectionByStickerId) =>
+        set((state) => ({
+          collectionByStickerId: sanitizeCollection(
+            collectionByStickerId,
+            state.collectionByStickerId,
+          ),
+        })),
 
       applyTrade: (receiveIds, giveIds) => {
         let tradeResult: ApplyTradeResult = {

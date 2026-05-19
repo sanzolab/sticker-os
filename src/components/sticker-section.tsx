@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { memo, useCallback, useEffect, useState } from "react";
-import { StickerCell } from "@/components/sticker-cell";
+import { StickerCell, StickerTile } from "@/components/sticker-cell";
 import { useSectionLifecycle } from "@/components/use-section-lifecycle";
 import { getSectionLifecycleRegistry } from "@/lib/section-lifecycle";
 import { t } from "@/lib/i18n";
@@ -21,13 +21,15 @@ export const StickerSection = memo(function StickerSection({
   missing,
   duplicates,
   onEditDuplicates,
+  collectionByStickerId,
 }: {
   active: boolean;
   group: StickerGroup;
   stickers: Sticker[];
   missing: number;
   duplicates: number;
-  onEditDuplicates: (sticker: Sticker) => void;
+  onEditDuplicates?: (sticker: Sticker) => void;
+  collectionByStickerId?: Record<string, number>;
 }) {
   const locale = useStickerStore((state) => state.settings.locale);
   const registry = getSectionLifecycleRegistry();
@@ -116,13 +118,22 @@ export const StickerSection = memo(function StickerSection({
           >
             <div className="min-h-0">
               <div className={gridClassName}>
-                {groupStickers.map((sticker) => (
-                  <StickerCell
-                    key={sticker.id}
-                    sticker={sticker}
-                    onEditDuplicates={onEditDuplicates}
-                  />
-                ))}
+                {groupStickers.map((sticker) =>
+                  collectionByStickerId ? (
+                    <StickerTile
+                      key={sticker.id}
+                      sticker={sticker}
+                      copies={collectionByStickerId[sticker.id] ?? 0}
+                      interactive={false}
+                    />
+                  ) : (
+                    <StickerCell
+                      key={sticker.id}
+                      sticker={sticker}
+                      onEditDuplicates={onEditDuplicates!}
+                    />
+                  ),
+                )}
               </div>
             </div>
           </div>

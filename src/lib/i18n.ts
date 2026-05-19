@@ -6,6 +6,7 @@ const translations = {
   en: {
     "common.cancel": "Cancel",
     "common.clearSearch": "Clear search",
+    "common.close": "Close",
     "common.confirm": "Confirm",
     "common.share": "Share",
     "common.copyTxt": "Copy TXT",
@@ -82,6 +83,18 @@ const translations = {
     "share.action.share": "Share",
     "share.action.copyTxt": "Copy TXT",
     "share.action.downloadTxt": "Download TXT",
+    "share.action.shareAlbumLink": "Share album link",
+    "share.link.title": "StickerOS shared album",
+    "share.link.description": "Open this link in StickerOS to compare or import.",
+    "share.link.preparing": "Preparing link...",
+    "share.link.errorTooLong":
+      "This album is too large to share as a link on this device.",
+    "share.link.errorGeneric":
+      "Could not prepare the shared album link. Try reopening share options.",
+    "share.link.manualCopyHint":
+      "Automatic copy was blocked. You can copy this link manually.",
+    "share.link.manualCopyFieldAria": "Shared album link",
+    "share.link.manualCopyAction": "Copy link",
     "share.toast.copied": "Copied",
     "share.toast.downloaded": "Downloaded",
     "export.kind.missing": "Missing",
@@ -156,6 +169,81 @@ const translations = {
     "trade.error.staleReceive":
       "One or more stickers you want to receive are no longer missing. Re-scan to get updated matches.",
     "trade.myQr.title": "My Trade QR",
+    "sharedLink.loadingTitle": "Loading shared album",
+    "sharedLink.loadingDescription":
+      "Validating this shared snapshot before showing options.",
+    "sharedLink.error.title": "Could not open shared album",
+    "sharedLink.error.invalid":
+      "This shared link is invalid or unreadable.",
+    "sharedLink.error.invalidCollection":
+      "This shared link belongs to a different StickerOS collection.",
+    "sharedLink.error.invalidVersion":
+      "This shared link was created by an unsupported version.",
+    "sharedLink.error.invalidCompression":
+      "This device cannot decode the shared link format.",
+    "sharedLink.goHome": "Back to app",
+    "sharedLink.snapshotBadge": "Shared snapshot",
+    "sharedLink.title": "{name}'s shared album",
+    "sharedLink.description":
+      "Choose what to do with this album snapshot.",
+    "sharedLink.senderFallback": "Collector",
+    "sharedLink.back": "Back",
+    "sharedLink.openMainApp": "Open main album",
+    "sharedLink.actions.exchange": "Exchange stickers",
+    "sharedLink.actions.exchangeDescription":
+      "Compare this shared album with yours to find possible trades.",
+    "sharedLink.actions.import": "Copy / Recover album",
+    "sharedLink.actions.importDescription":
+      "Import this shared snapshot into this device.",
+    "sharedLink.actions.view": "View shared album",
+    "sharedLink.actions.viewDescription":
+      "Review this shared album in read-only mode.",
+    "sharedLink.exchange.title": "Exchange from shared link",
+    "sharedLink.exchange.description":
+      "These matches are based on the shared album snapshot.",
+    "sharedLink.exchange.receiveDetail":
+      "{name} can give you {count} stickers from this snapshot.",
+    "sharedLink.exchange.giveDetail":
+      "You can give {name} {count} stickers based on this snapshot.",
+    "sharedLink.exchange.confirmDescription":
+      "Review this snapshot-based exchange before applying changes.",
+    "sharedLink.exchange.confirmAction": "Apply exchange",
+    "sharedLink.import.strategyTitle": "Choose import strategy",
+    "sharedLink.import.strategyDescription":
+      "Your local album has progress. Choose how to combine data.",
+    "sharedLink.import.strategy.replace": "Replace current album",
+    "sharedLink.import.strategy.add": "Add copies together",
+    "sharedLink.import.strategy.highest": "Keep highest count",
+    "sharedLink.import.warning.replace":
+      "This will overwrite local progress with the shared snapshot.",
+    "sharedLink.import.warning.add":
+      "This adds local and shared counts. Using it on a backup of the same album may inflate duplicates.",
+    "sharedLink.import.warning.highest":
+      "This keeps the highest copy count per sticker and avoids duplicate inflation.",
+    "sharedLink.import.cancel": "Cancel",
+    "sharedLink.import.continue": "Continue",
+    "sharedLink.import.confirmTitle": "Confirm album import",
+    "sharedLink.import.confirmDescription":
+      "Review the impact before changing your local album.",
+    "sharedLink.import.finalWarning":
+      "Local album data will change only after your final confirmation.",
+    "sharedLink.import.apply": "Import album",
+    "sharedLink.import.successBanner":
+      "Album imported successfully.",
+    "sharedLink.import.dialogTitle": "Apply import now?",
+    "sharedLink.import.dialogDescription":
+      "This action updates the local album on this device.",
+    "sharedLink.summary.localCollected": "Current local collected",
+    "sharedLink.summary.sharedCollected": "Shared album collected",
+    "sharedLink.summary.resultCollected": "Result collected",
+    "sharedLink.summary.localDuplicates": "Current local duplicates",
+    "sharedLink.summary.sharedDuplicates": "Shared album duplicates",
+    "sharedLink.summary.resultDuplicates": "Result duplicates",
+    "sharedLink.summary.localCompletion": "Current local completion",
+    "sharedLink.summary.resultCompletion": "Result completion",
+    "sharedLink.viewer.title": "Read-only shared album",
+    "sharedLink.viewer.description":
+      "This view never changes your local album.",
     "addStickers.badge": "Quick capture",
     "addStickers.title": "Add stickers",
     "addStickers.description":
@@ -267,6 +355,7 @@ const translations = {
   es: {
     "common.cancel": "Cancelar",
     "common.clearSearch": "Limpiar búsqueda",
+    "common.close": "Cerrar",
     "common.confirm": "Confirmar",
     "common.share": "Compartir",
     "common.copyTxt": "Copiar TXT",
@@ -345,6 +434,19 @@ const translations = {
     "share.action.share": "Compartir",
     "share.action.copyTxt": "Copiar TXT",
     "share.action.downloadTxt": "Descargar TXT",
+    "share.action.shareAlbumLink": "Compartir enlace del álbum",
+    "share.link.title": "Álbum compartido de StickerOS",
+    "share.link.description":
+      "Abre este enlace en StickerOS para comparar o importar.",
+    "share.link.preparing": "Preparando enlace...",
+    "share.link.errorTooLong":
+      "Este álbum es demasiado grande para compartirlo como enlace en este dispositivo.",
+    "share.link.errorGeneric":
+      "No se pudo preparar el enlace del álbum compartido. Vuelve a abrir las opciones de compartir.",
+    "share.link.manualCopyHint":
+      "La copia automática fue bloqueada. Puedes copiar este enlace manualmente.",
+    "share.link.manualCopyFieldAria": "Enlace de álbum compartido",
+    "share.link.manualCopyAction": "Copiar enlace",
     "share.toast.copied": "Copiado",
     "share.toast.downloaded": "Descargado",
     "export.kind.missing": "Faltantes",
@@ -421,6 +523,81 @@ const translations = {
     "trade.error.staleReceive":
       "Una o más figuritas que quieres recibir ya las tienes. Vuelve a escanear para obtener coincidencias actualizadas.",
     "trade.myQr.title": "Mi QR de intercambio",
+    "sharedLink.loadingTitle": "Cargando álbum compartido",
+    "sharedLink.loadingDescription":
+      "Validando esta instantánea compartida antes de mostrar opciones.",
+    "sharedLink.error.title": "No se pudo abrir el álbum compartido",
+    "sharedLink.error.invalid":
+      "Este enlace compartido no es válido o no se puede leer.",
+    "sharedLink.error.invalidCollection":
+      "Este enlace compartido pertenece a otra colección de StickerOS.",
+    "sharedLink.error.invalidVersion":
+      "Este enlace compartido fue creado con una versión no compatible.",
+    "sharedLink.error.invalidCompression":
+      "Este dispositivo no puede decodificar el formato del enlace compartido.",
+    "sharedLink.goHome": "Volver a la app",
+    "sharedLink.snapshotBadge": "Instantánea compartida",
+    "sharedLink.title": "Álbum compartido de {name}",
+    "sharedLink.description":
+      "Elige qué quieres hacer con esta instantánea del álbum.",
+    "sharedLink.senderFallback": "Coleccionista",
+    "sharedLink.back": "Volver",
+    "sharedLink.openMainApp": "Abrir álbum principal",
+    "sharedLink.actions.exchange": "Intercambiar figuritas",
+    "sharedLink.actions.exchangeDescription":
+      "Compara este álbum compartido con el tuyo para ver posibles intercambios.",
+    "sharedLink.actions.import": "Copiar / Recuperar álbum",
+    "sharedLink.actions.importDescription":
+      "Importa esta instantánea compartida en este dispositivo.",
+    "sharedLink.actions.view": "Ver álbum compartido",
+    "sharedLink.actions.viewDescription":
+      "Revisa este álbum compartido en modo de solo lectura.",
+    "sharedLink.exchange.title": "Intercambio desde enlace compartido",
+    "sharedLink.exchange.description":
+      "Estas coincidencias se basan en la instantánea compartida.",
+    "sharedLink.exchange.receiveDetail":
+      "{name} puede darte {count} figuritas según esta instantánea.",
+    "sharedLink.exchange.giveDetail":
+      "Puedes darle a {name} {count} figuritas según esta instantánea.",
+    "sharedLink.exchange.confirmDescription":
+      "Revisa este intercambio basado en instantánea antes de aplicar cambios.",
+    "sharedLink.exchange.confirmAction": "Aplicar intercambio",
+    "sharedLink.import.strategyTitle": "Elige estrategia de importación",
+    "sharedLink.import.strategyDescription":
+      "Tu álbum local tiene progreso. Elige cómo combinar los datos.",
+    "sharedLink.import.strategy.replace": "Reemplazar álbum actual",
+    "sharedLink.import.strategy.add": "Sumar copias",
+    "sharedLink.import.strategy.highest": "Conservar mayor cantidad",
+    "sharedLink.import.warning.replace":
+      "Esto reemplazará tu progreso local con la instantánea compartida.",
+    "sharedLink.import.warning.add":
+      "Esto suma cantidades locales y compartidas. Si importas un respaldo del mismo álbum, puede inflar las repetidas.",
+    "sharedLink.import.warning.highest":
+      "Esto conserva la mayor cantidad por figurita y evita inflar repetidas.",
+    "sharedLink.import.cancel": "Cancelar",
+    "sharedLink.import.continue": "Continuar",
+    "sharedLink.import.confirmTitle": "Confirmar importación del álbum",
+    "sharedLink.import.confirmDescription":
+      "Revisa el impacto antes de cambiar tu álbum local.",
+    "sharedLink.import.finalWarning":
+      "Los datos del álbum local solo cambiarán después de tu confirmación final.",
+    "sharedLink.import.apply": "Importar álbum",
+    "sharedLink.import.successBanner":
+      "Álbum importado con éxito.",
+    "sharedLink.import.dialogTitle": "¿Aplicar importación ahora?",
+    "sharedLink.import.dialogDescription":
+      "Esta acción actualiza el álbum local en este dispositivo.",
+    "sharedLink.summary.localCollected": "Conseguidas locales actuales",
+    "sharedLink.summary.sharedCollected": "Conseguidas del álbum compartido",
+    "sharedLink.summary.resultCollected": "Conseguidas resultado",
+    "sharedLink.summary.localDuplicates": "Repetidas locales actuales",
+    "sharedLink.summary.sharedDuplicates": "Repetidas del álbum compartido",
+    "sharedLink.summary.resultDuplicates": "Repetidas resultado",
+    "sharedLink.summary.localCompletion": "Progreso local actual",
+    "sharedLink.summary.resultCompletion": "Progreso resultado",
+    "sharedLink.viewer.title": "Álbum compartido de solo lectura",
+    "sharedLink.viewer.description":
+      "Esta vista nunca modifica tu álbum local.",
     "addStickers.badge": "Captura rápida",
     "addStickers.title": "Agregar figuritas",
     "addStickers.description":

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { Check, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CollectionHeader } from "@/components/collection-header";
 import { DuplicateEditor } from "@/components/duplicate-editor";
 import { AlbumTabPanel } from "@/components/album-tab-panel";
@@ -15,6 +16,7 @@ import { resolveTabScrollTarget } from "@/components/tab-scroll-restoration";
 import { useIsomorphicLayoutEffect } from "@/components/use-isomorphic-layout-effect";
 import { useElementHeight } from "@/hooks/use-element-height";
 import { useAssistantStore } from "@/lib/assistant-store";
+import { t } from "@/lib/i18n";
 import { usePageScrollVisibility, useRegisterStickyActivation } from "@/lib/scroll-visibility";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
 import { useTradeSessionStore } from "@/lib/trade-session";
@@ -66,6 +68,23 @@ export function StickerOSApp() {
   );
   const addStickersOpen = useAssistantStore((s) => s.addStickersOpen);
   const setAddStickersOpen = useAssistantStore((s) => s.setAddStickersOpen);
+
+  const [showImportSuccess, setShowImportSuccess] = useState(() => {
+    if (typeof window !== "undefined") {
+      const flag = sessionStorage.getItem("stickeros-import-success");
+      if (flag) {
+        sessionStorage.removeItem("stickeros-import-success");
+        return true;
+      }
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (!showImportSuccess) return;
+    const timer = window.setTimeout(() => setShowImportSuccess(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [showImportSuccess]);
 
   const handleEditDuplicates = useCallback((sticker: Sticker) => {
     setDuplicateEditorSticker(sticker);
@@ -192,7 +211,25 @@ export function StickerOSApp() {
   }, [switchTab]);
 
   return (
-    <main className="min-h-dvh bg-background text-foreground">
+    <main className="app-wrapper text-foreground">
+      {showImportSuccess && (
+        <div className="fixed inset-x-0 top-0 z-50 flex justify-center p-4">
+          <div className="flex w-full max-w-xl items-center gap-3 rounded-sm border bg-card px-4 py-3 shadow-lg animate-in fade-in slide-in-from-top-2">
+            <Check className="size-5 shrink-0 text-green-500" />
+            <p className="text-sm font-medium">
+              {t(locale, "sharedLink.import.successBanner")}
+            </p>
+            <button
+              type="button"
+              className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground active:bg-accent"
+              onClick={() => setShowImportSuccess(false)}
+              aria-label={t(locale, "common.close")}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <div data-scroll-chrome="shared">
         <TopBar
           rootRef={topBarRef}

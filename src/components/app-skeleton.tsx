@@ -1,6 +1,6 @@
 export default function AppSkeleton() {
   return (
-    <main className="min-h-dvh bg-background text-foreground animate-pulse">
+    <main className="app-wrapper text-foreground animate-pulse">
       {/* HEADER */}
       <header className="safe-top fixed inset-x-0 top-0 z-40 bg-background">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">

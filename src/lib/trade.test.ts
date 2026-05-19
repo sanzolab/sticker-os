@@ -7,6 +7,7 @@ import {
   canApplyTrade,
   previewTradeImpact,
 } from "@/lib/trade";
+import { getSharedAlbumSnapshotFromCollection } from "@/lib/shared-album-link";
 
 const [first, second, third, fourth] = stickers;
 
@@ -33,6 +34,28 @@ describe("trade matching", () => {
 
     expect(matches.receiveIds).toHaveLength(3);
     expect(matches.giveIds).toHaveLength(1);
+  });
+
+  it("matches shared link snapshot inputs the same way as QR-style sets", () => {
+    const remoteSnapshot = getSharedAlbumSnapshotFromCollection({
+      collectionByStickerId: {
+        [first.id]: 0,
+        [second.id]: 2,
+        [third.id]: 1,
+        [fourth.id]: 0,
+      },
+      senderName: "Remote",
+    });
+
+    const matches = buildTradeMatches({
+      localMissingIds: [second.id, third.id],
+      localDuplicateIds: [first.id],
+      remoteMissingIds: remoteSnapshot.missingIds,
+      remoteDuplicateIds: remoteSnapshot.duplicateIds,
+    });
+
+    expect(matches.receiveIds).toEqual([second.id]);
+    expect(matches.giveIds).toEqual([first.id]);
   });
 });
 

@@ -80,11 +80,18 @@
   border-color: var(--border);
 }
 
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
 html {
   box-sizing: border-box;
   min-height: 100dvh;
   background-color: var(--background);
   -webkit-tap-highlight-color: transparent;
+  scroll-padding-top: 8rem;
 }
 
 body {
@@ -92,10 +99,16 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
-html {
-  scroll-padding-top: 8rem;
+.app-wrapper {
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+  background-color: var(--background);
 }
 
 button,
