@@ -207,7 +207,7 @@ input {
 .speed-dial-actions {
   position: absolute;
   bottom: calc(100% + 0.75rem);
-  right: 2px;
+  right: 3px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -217,8 +217,8 @@ input {
 /* Pseudo-element idle pulse ring on the main FAB button */
 .speed-dial-fab {
   position: relative;
-  width: 3rem;
-  height: 3rem;
+  width: 3.2rem;
+  height: 3.2rem;
   border-radius: 50%;
   background: var(--primary);
   color: var(--primary-foreground);
@@ -274,8 +274,8 @@ input {
 /* FAB action item (circular icon button) */
 .speed-dial-action {
   position: relative;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.8rem;
+  height: 2.8rem;
   border-radius: 50%;
   background: white;
   color: var(--background);
