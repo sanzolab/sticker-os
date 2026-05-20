@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getCompactStickerCode,
   getCompactStickerLabel,
   getStickerExportLabel,
   getStickerSearchValues,
@@ -87,5 +88,10 @@ describe("sticker locale metadata", () => {
       secondary: "14",
       detail: "Coca Cola",
     });
+
+    expect(getCompactStickerCode(fwc)).toBe("FWC 00");
+    expect(getCompactStickerCode(mexico)).toBe("MEX 11");
+    expect(getCompactStickerCode(usa)).toBe("USA 18");
+    expect(getCompactStickerCode(cocaCola)).toBe("CC 14");
   });
 });

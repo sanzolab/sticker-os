@@ -617,6 +617,19 @@ export function getCompactStickerLabel(
   };
 }
 
+export function getCompactStickerCode(sticker: Sticker) {
+  if (sticker.category === "fwc") {
+    return `FWC ${sticker.number}`;
+  }
+
+  if (sticker.category === "cc") {
+    return `CC ${sticker.number}`;
+  }
+
+  const code = sticker.countryCode ?? sticker.groupId.toUpperCase();
+  return `${code} ${sticker.number}`;
+}
+
 export function getStickerSearchValues(sticker: Sticker, locale: Locale) {
   const group = stickerGroupsById[sticker.groupId];
   const values = [

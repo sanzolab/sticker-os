@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Camera, ImagePlus, Sparkles, Upload, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -184,6 +185,7 @@ export function PhotoCapturePanel() {
       );
 
       if (!result.ok) {
+        toast.error(t(locale, "toast.detected.failed"));
         setCaptureFeedback({
           title: t(locale, "addStickers.error.title"),
           message: result.error.message,
@@ -192,6 +194,7 @@ export function PhotoCapturePanel() {
       }
 
       if (isEmptyAnalysisResult(result.result)) {
+        toast.error(t(locale, "toast.detected.failed"));
         setCaptureFeedback({
           title: t(locale, "addStickers.empty.title"),
           message: t(locale, "addStickers.empty.description"),
@@ -200,6 +203,9 @@ export function PhotoCapturePanel() {
       }
 
       appendResult(result.result);
+      if (result.result.unresolved.length > 0) {
+        toast.warning(t(locale, "toast.detected.unmatched"));
+      }
       setMode("review");
       setCaptureFeedback(null);
     } finally {
@@ -234,11 +240,17 @@ export function PhotoCapturePanel() {
   }, [analyzePhoto, clearConfirmState, pendingFile]);
 
   const confirmAdd = useCallback(() => {
-    confirmAndConsume().forEach((candidate) => {
+    const selectedCandidates = confirmAndConsume();
+    selectedCandidates.forEach((candidate) => {
       tapSticker(candidate.stickerId);
     });
+    if (selectedCandidates.length > 0) {
+      toast.success(t(locale, "toast.detected.added", {
+        count: selectedCandidates.length,
+      }));
+    }
     closePanel();
-  }, [closePanel, confirmAndConsume, tapSticker]);
+  }, [closePanel, confirmAndConsume, locale, tapSticker]);
 
   const captureMore = useCallback(() => {
     setMode("capture");
@@ -247,9 +259,10 @@ export function PhotoCapturePanel() {
 
   const discardPending = useCallback(() => {
     clearPending();
+    toast(t(locale, "toast.detected.discarded"));
     setMode("capture");
     setCaptureFeedback(null);
-  }, [clearPending]);
+  }, [clearPending, locale]);
 
   useEffect(() => {
     if (isOpen && !restoreFocusRef.current) {

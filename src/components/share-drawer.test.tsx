@@ -258,7 +258,6 @@ function renderDrawer() {
       onOpenChange={vi.fn()}
       collectionName="StickerOS"
       collectionByStickerId={{}}
-      onShareStateChange={vi.fn()}
     />,
   );
 }
@@ -297,7 +296,6 @@ describe("ShareDrawer album link integration with real buildSharedAlbumLinkData"
         onOpenChange={vi.fn()}
         collectionName="IntegrationTest"
         collectionByStickerId={collection}
-        onShareStateChange={vi.fn()}
       />,
     );
 
@@ -351,7 +349,6 @@ describe("ShareDrawer album link integration with real buildSharedAlbumLinkData"
         onOpenChange={vi.fn()}
         collectionName="IntegrationTest"
         collectionByStickerId={collection}
-        onShareStateChange={vi.fn()}
       />,
     );
 
@@ -397,7 +394,6 @@ describe("ShareDrawer album link integration with real buildSharedAlbumLinkData"
         onOpenChange={vi.fn()}
         collectionName="Test"
         collectionByStickerId={null as unknown as Record<string, number>}
-        onShareStateChange={vi.fn()}
       />,
     );
 
@@ -442,7 +438,6 @@ describe("ShareDrawer album link integration with real buildSharedAlbumLinkData"
         onOpenChange={vi.fn()}
         collectionName="Test"
         collectionByStickerId={collection}
-        onShareStateChange={vi.fn()}
       />,
     );
 

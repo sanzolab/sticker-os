@@ -1,18 +1,59 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { SpecialStickerMark } from "@/components/special-sticker-mark";
 import { haptic } from "@/lib/haptic";
+import { t, type Locale } from "@/lib/i18n";
 import { getVisualStateFromCopies } from "@/lib/getVisualStateFromCopies";
-import { Sticker } from "@/lib/sticker-data";
+import { getCompactStickerCode, Sticker } from "@/lib/sticker-data";
 import { useStickerStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+
+const stickerCodeToken = "__STICKER_CODE__";
+
+function renderStickerToastTitle(
+  locale: Locale,
+  key: "toast.sticker.added" | "toast.sticker.removed",
+  code: string,
+  tone: "success" | "remove",
+) {
+  const template = t(locale, key, { code: stickerCodeToken });
+  const tokenIndex = template.indexOf(stickerCodeToken);
+  const before =
+    tokenIndex === -1 ? template : template.slice(0, tokenIndex);
+  const after =
+    tokenIndex === -1
+      ? ""
+      : template.slice(tokenIndex + stickerCodeToken.length);
+  const chipToneClasses =
+    tone === "success"
+      ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 dark:border-emerald-400/35 dark:bg-emerald-400/15 dark:text-emerald-200"
+      : "border-red-500/30 bg-red-500/10 text-red-700 dark:border-red-400/35 dark:bg-red-500/15 dark:text-red-200";
+
+  return (
+    <span className="text-sm text-current">
+      {before}
+      <span
+        data-testid="sticker-toast-code-chip"
+        className={cn(
+          "mx-1 inline-flex items-center rounded-sm border px-1.5 py-0.5 font-semibold leading-none tabular-nums",
+          chipToneClasses,
+        )}
+      >
+        {code}
+      </span>
+      {after}
+    </span>
+  );
+}
 
 export const StickerTile = memo(function StickerTile({
   sticker,
   copies,
   animations = true,
   interactive = true,
+  highlighted = false,
   onTap,
   onLongPress,
 }: {
@@ -20,6 +61,7 @@ export const StickerTile = memo(function StickerTile({
   copies: number;
   animations?: boolean;
   interactive?: boolean;
+  highlighted?: boolean;
   onTap?: () => void;
   onLongPress?: () => void;
 }) {
@@ -70,6 +112,8 @@ export const StickerTile = memo(function StickerTile({
       "rounded-sm border border-dashed !border-amber-300/60 bg-amber-50/15 text-amber-700/45 hover:!border-amber-300/80 hover:bg-amber-50/25 dark:!border-amber-500/30 dark:bg-transparent dark:text-muted-foreground/40 dark:hover:!border-amber-500/30 dark:hover:bg-transparent",
     sticker.special && state === "owned" &&
       "rounded-sm border !border-amber-300/80 bg-amber-100/70 text-amber-700 hover:!border-amber-400/80 hover:bg-amber-100/85 dark:!border-amber-400/40 dark:bg-amber-950/20 dark:text-amber-300 dark:hover:!border-amber-400/40 dark:hover:bg-amber-950/20",
+    highlighted &&
+      "ring-2 ring-sky-500/70 ring-offset-1 ring-offset-background !border-sky-500/45 bg-sky-500/10 text-foreground dark:ring-sky-400/70 dark:!border-sky-400/50 dark:bg-sky-500/20",
   );
 
   const cellStyle =
@@ -143,21 +187,88 @@ export const StickerCell = memo(function StickerCell({
   );
   const tapSticker = useStickerStore((state) => state.tapSticker);
   const removeSticker = useStickerStore((state) => state.removeSticker);
+  const setStickerCopies = useStickerStore((state) => state.setStickerCopies);
   const animations = useStickerStore((state) => state.settings.animations);
   const haptics = useStickerStore((state) => state.settings.haptics);
+  const locale = useStickerStore((state) => state.settings.locale);
+  const [highlighted, setHighlighted] = useState(false);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
+
+  const highlightSticker = useCallback(() => {
+    setHighlighted(true);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => {
+      setHighlighted(false);
+      highlightTimer.current = null;
+    }, 1500);
+  }, []);
 
   return (
     <StickerTile
       sticker={sticker}
       copies={copies}
       animations={animations}
+      highlighted={highlighted}
       onTap={() => {
         if (haptics) haptic("light");
+        const previousCopies = copies;
+        const compactCode = getCompactStickerCode(sticker);
         tapSticker(sticker.id);
+        highlightSticker();
+        toast.success(
+          renderStickerToastTitle(
+            locale,
+            "toast.sticker.added",
+            compactCode,
+            "success",
+          ),
+          {
+            action: {
+              label: t(locale, "toast.action.undo"),
+              onClick: () => {
+                setStickerCopies(sticker.id, previousCopies);
+              },
+            },
+          },
+        );
       }}
       onLongPress={() => {
         if (haptics) haptic("medium");
-        if (copies === 1) removeSticker(sticker.id);
+        if (copies === 1) {
+          const previousCopies = copies;
+          const compactCode = getCompactStickerCode(sticker);
+          removeSticker(sticker.id);
+          highlightSticker();
+          toast(
+            renderStickerToastTitle(
+              locale,
+              "toast.sticker.removed",
+              compactCode,
+              "remove",
+            ),
+            {
+              className:
+                "border-red-500/25 bg-red-50 text-red-950 dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-100",
+              classNames: {
+                actionButton:
+                  "rounded-full bg-red-700 text-white hover:bg-red-700/90 dark:bg-red-500 dark:hover:bg-red-500/90",
+              },
+              action: {
+                label: t(locale, "toast.action.undo"),
+                onClick: () => {
+                  setStickerCopies(sticker.id, previousCopies);
+                },
+              },
+            },
+          );
+        }
         if (copies > 1) onEditDuplicates(sticker);
       }}
     />

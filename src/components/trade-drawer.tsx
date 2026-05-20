@@ -5,6 +5,7 @@ import QRCode from "react-qr-code";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, QrCode, ScanLine, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,11 @@ import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { stickers, stickersByStickerOsIndex } from "@/lib/sticker-data";
 import { useStickerStore } from "@/lib/store";
 import { useTradeSessionStore } from "@/lib/trade-session";
+import {
+  cloneCollection,
+  hasCollectionChangedSinceExpected,
+  type CollectionSnapshotUndo,
+} from "@/lib/collection-snapshot-undo";
 import {
   buildTradeMatches,
   getLocalDuplicateIds,
@@ -46,7 +52,12 @@ export function TradeDrawer({
   const [qrValue, setQrValue] = useState("");
   const [showMyQr, setShowMyQr] = useState(false);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [exchangeUndoDialogOpen, setExchangeUndoDialogOpen] = useState(false);
+  const [pendingExchangeUndo, setPendingExchangeUndo] = useState<CollectionSnapshotUndo | null>(
+    null,
+  );
   const scanAbortRef = useRef<AbortController | null>(null);
+  const lastScannedCodeRef = useRef<string | null>(null);
 
   const locale = useStickerStore((state) => state.settings.locale);
   const collectionName = useStickerStore((state) => state.selectedCollection);
@@ -54,6 +65,9 @@ export function TradeDrawer({
     (state) => state.collectionByStickerId,
   );
   const applyTrade = useStickerStore((state) => state.applyTrade);
+  const setCollectionByStickerId = useStickerStore(
+    (state) => state.setCollectionByStickerId,
+  );
   const result = useTradeSessionStore((state) => state.result);
   const selectedReceiveIds = useTradeSessionStore(
     (state) => state.selectedReceiveIds,
@@ -102,6 +116,8 @@ export function TradeDrawer({
     if (!nextOpen) {
       setShowMyQr(false);
       setExitDialogOpen(false);
+      setExchangeUndoDialogOpen(false);
+      lastScannedCodeRef.current = null;
     }
     onOpenChange(nextOpen);
   };
@@ -122,8 +138,15 @@ export function TradeDrawer({
 
       if (!parsed.ok) {
         setScanErrorKey(parsed.errorKey);
+        toast.error(t(locale, "toast.scan.invalid"));
         return;
       }
+
+      if (lastScannedCodeRef.current === value) {
+        toast.warning(t(locale, "toast.scan.duplicate"));
+        return;
+      }
+      lastScannedCodeRef.current = value;
 
       const matches = buildTradeMatches({
         localMissingIds: getLocalMissingIds(collectionByStickerId),
@@ -140,8 +163,9 @@ export function TradeDrawer({
       setScanErrorKey(null);
       setApplyErrorKey(null);
       setStep("result");
+      toast.success(t(locale, "toast.scan.success"));
     },
-    [collectionByStickerId, setTradeResult],
+    [collectionByStickerId, locale, setTradeResult],
   );
 
   const toggleReceive = (id: string) => {
@@ -187,6 +211,7 @@ export function TradeDrawer({
   const activeStep = result ? "result" : step;
 
   const confirmTrade = () => {
+    const previousCollection = cloneCollection(collectionByStickerId);
     const tradeResult = applyTrade(selectedReceiveIds, selectedGiveIds);
 
     if (!tradeResult.ok) {
@@ -197,8 +222,26 @@ export function TradeDrawer({
             ? "trade.error.staleReceive"
             : "trade.error.invalidSelection",
       );
+      toast.error(t(locale, "toast.exchange.failed"));
       return;
     }
+
+    const expectedCurrentCollection = cloneCollection(
+      useStickerStore.getState().collectionByStickerId,
+    );
+
+    setPendingExchangeUndo({
+      beforeCollection: previousCollection,
+      expectedCurrentCollection,
+    });
+    toast.success(t(locale, "toast.exchange.completed"), {
+      action: {
+        label: t(locale, "toast.action.undo"),
+        onClick: () => {
+          setExchangeUndoDialogOpen(true);
+        },
+      },
+    });
 
     clearTradeSession();
     setStep("entry");
@@ -211,6 +254,7 @@ export function TradeDrawer({
     setScanErrorKey(null);
     setExitDialogOpen(false);
     setStep("entry");
+    lastScannedCodeRef.current = null;
   };
 
   return (
@@ -578,6 +622,58 @@ export function TradeDrawer({
                 onClick={discardTrade}
               >
                 {t(locale, "trade.exit.dialogConfirm")}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={exchangeUndoDialogOpen}
+        onOpenChange={setExchangeUndoDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(locale, "toast.exchange.undoTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingExchangeUndo &&
+              hasCollectionChangedSinceExpected({
+                currentCollection: collectionByStickerId,
+                expectedCurrentCollection: pendingExchangeUndo.expectedCurrentCollection,
+              })
+                ? t(locale, "toast.exchange.undoOverwriteDescription")
+                : t(locale, "toast.exchange.undoDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button type="button" variant="secondary" className="shadow-none">
+                {t(locale, "common.cancel")}
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                className="shadow-none"
+                onClick={() => {
+                  if (!pendingExchangeUndo) {
+                    setExchangeUndoDialogOpen(false);
+                    return;
+                  }
+
+                  try {
+                    setCollectionByStickerId(pendingExchangeUndo.beforeCollection);
+                    setPendingExchangeUndo(null);
+                    setExchangeUndoDialogOpen(false);
+                    toast.success(t(locale, "toast.exchange.reverted"));
+                  } catch {
+                    toast.error(t(locale, "toast.exchange.revertFailed"));
+                  }
+                }}
+              >
+                {t(locale, "toast.exchange.undoConfirm")}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>

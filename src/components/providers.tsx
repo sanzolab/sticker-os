@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { useStickerStore } from "@/lib/store";
+import { Toaster } from "@/components/ui/sonner";
 
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -16,6 +17,7 @@ export function Providers({ children }: { children: ReactNode }) {
       disableTransitionOnChange
     >
       {children}
+      <Toaster />
     </NextThemesProvider>
   );
 }

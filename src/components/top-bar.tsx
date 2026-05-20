@@ -10,11 +10,8 @@ import {
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
-export type ShareState = "idle" | "copied" | "downloaded";
-
 export function TopBar({
   collectionName,
-  shareState,
   pendingAddStickersCount,
   tradeBadgeValue = null,
   hiddenProgress = 0,
@@ -26,7 +23,6 @@ export function TopBar({
   onSettings,
 }: {
   collectionName: string;
-  shareState: ShareState;
   pendingAddStickersCount: number;
   tradeBadgeValue?: string | null;
   hiddenProgress?: number;
@@ -135,13 +131,6 @@ export function TopBar({
           </Button>
         </div>
       </div>
-      {shareState !== "idle" && (
-        <div className="absolute right-14 top-full mt-2 rounded-sm border bg-card px-2.5 py-1 text-xs text-muted-foreground">
-          {shareState === "copied"
-            ? t(locale, "topbar.shareStatus.copied")
-            : t(locale, "topbar.shareStatus.downloaded")}
-        </div>
-      )}
     </header>
   );
 }

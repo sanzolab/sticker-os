@@ -2,6 +2,7 @@
 
 import { Copy, Download, Link2, Share2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
@@ -41,13 +42,11 @@ export function ShareDrawer({
   onOpenChange,
   collectionName,
   collectionByStickerId,
-  onShareStateChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   collectionName: string;
   collectionByStickerId: Record<string, number>;
-  onShareStateChange: (state: "idle" | "copied" | "downloaded") => void;
 }) {
   const [exportKind, setExportKind] = useState<ExportKind>("missing");
   const [linkState, setLinkState] = useState<ShareLinkState>("idle");
@@ -69,11 +68,6 @@ export function ShareDrawer({
     );
   const exportMeta = getExportMeta(exportKind, locale);
 
-  const announceShareState = useCallback((state: "copied" | "downloaded") => {
-    onShareStateChange(state);
-    window.setTimeout(() => onShareStateChange("idle"), 1400);
-  }, [onShareStateChange]);
-
   const shareExport = async () => {
     const exportText = getExportText();
 
@@ -92,10 +86,16 @@ export function ShareDrawer({
 
     const copied = await copyText(exportText);
     if (copied) {
-      announceShareState("copied");
+      toast.success(t(locale, "toast.common.copiedSuccess"));
     } else {
-      downloadText(exportMeta.fileName, exportText);
-      announceShareState("downloaded");
+      const downloaded = downloadText(exportMeta.fileName, exportText);
+      if (downloaded) {
+        toast.success(t(locale, "toast.common.txtDownloaded"), {
+          description: t(locale, "toast.common.txtDownloadedDescription"),
+        });
+      } else {
+        toast.error(t(locale, "toast.common.downloadFailed"));
+      }
     }
     onOpenChange(false);
   };
@@ -189,14 +189,14 @@ export function ShareDrawer({
 
       const copied = await copyText(url);
       if (copied) {
-        announceShareState("copied");
+        toast.success(t(locale, "toast.common.copiedSuccess"));
         onOpenChange(false);
         return;
       }
 
       setManualCopyVisible(true);
     },
-    [announceShareState, locale, onOpenChange],
+    [locale, onOpenChange],
   );
 
   const shareAlbumLink = async () => {
@@ -286,10 +286,9 @@ export function ShareDrawer({
               const exportText = getExportText();
               const copied = await copyText(exportText);
               if (copied) {
-                announceShareState("copied");
+                toast.success(t(locale, "toast.common.copiedSuccess"));
               } else {
-                downloadText(exportMeta.fileName, exportText);
-                announceShareState("downloaded");
+                toast.error(t(locale, "toast.common.copyFailed"));
               }
             }}
           >
@@ -301,8 +300,14 @@ export function ShareDrawer({
             size="pill"
             className="h-auto min-h-11 flex-col gap-1 whitespace-normal rounded-sm px-2 py-2 text-xs shadow-none"
             onClick={() => {
-              downloadText(exportMeta.fileName, getExportText());
-              announceShareState("downloaded");
+              const downloaded = downloadText(exportMeta.fileName, getExportText());
+              if (downloaded) {
+                toast.success(t(locale, "toast.common.txtDownloaded"), {
+                  description: t(locale, "toast.common.txtDownloadedDescription"),
+                });
+                return;
+              }
+              toast.error(t(locale, "toast.common.downloadFailed"));
             }}
           >
             <Download className="size-4" />
@@ -358,8 +363,11 @@ export function ShareDrawer({
               className="w-full shadow-none"
               onClick={async () => {
                 const copied = await copyText(albumShareUrl);
-                if (!copied) return;
-                announceShareState("copied");
+                if (!copied) {
+                  toast.error(t(locale, "toast.common.copyFailed"));
+                  return;
+                }
+                toast.success(t(locale, "toast.common.copiedSuccess"));
                 onOpenChange(false);
               }}
             >

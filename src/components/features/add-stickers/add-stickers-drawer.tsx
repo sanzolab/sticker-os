@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { analyzeVoiceSubmission } from "@/lib/voice-submit";
@@ -142,10 +143,13 @@ export function AddStickersDrawer({
     nextMode: AddStickersMode = "review",
   ) => {
     appendResult(nextResult);
+    if (nextResult.unresolved.length > 0) {
+      toast.warning(t(locale, "toast.detected.unmatched"));
+    }
     setIsLoading(false);
     setModeOverride(nextMode === "review" ? "review" : "capture");
     setError(null);
-  }, [appendResult]);
+  }, [appendResult, locale]);
 
   const analyzeRequest = useCallback(async (request: () => Promise<Response>) => {
     setIsLoading(true);
@@ -157,6 +161,7 @@ export function AddStickersDrawer({
       if (!result.ok) {
         setModeOverride("capture");
         setError(result.error);
+        toast.error(t(locale, "toast.detected.failed"));
         return;
       }
 
@@ -164,7 +169,7 @@ export function AddStickersDrawer({
     } finally {
       setIsLoading(false);
     }
-  }, [mergeResult, requestAnalysisResult]);
+  }, [locale, mergeResult, requestAnalysisResult]);
 
   const analyzeText = useCallback(async (text: string) => {
     await analyzeRequest(() =>
@@ -215,6 +220,8 @@ export function AddStickersDrawer({
     const result = await analyzeVoiceSubmission(locale, submission);
     if (result.ok) {
       setModeOverride("review");
+    } else {
+      toast.error(t(locale, "toast.detected.failed"));
     }
     setIsLoading(false);
     setError(null);
@@ -235,8 +242,13 @@ export function AddStickersDrawer({
   }, [analyzeFile, consumeQueuedPhotoCapture, open, queuedPhotoCapture]);
 
   const confirmAdd = () => {
-    confirmAndConsume()
-      .forEach((candidate) => tapSticker(candidate.stickerId));
+    const selectedCandidates = confirmAndConsume();
+    selectedCandidates.forEach((candidate) => tapSticker(candidate.stickerId));
+    if (selectedCandidates.length > 0) {
+      toast.success(t(locale, "toast.detected.added", {
+        count: selectedCandidates.length,
+      }));
+    }
     setModeOverride("capture");
     handleOpenChange(false);
   };
@@ -248,6 +260,7 @@ export function AddStickersDrawer({
 
   const discardPending = () => {
     clearPending();
+    toast(t(locale, "toast.detected.discarded"));
     setModeOverride("capture");
     setError(null);
   };

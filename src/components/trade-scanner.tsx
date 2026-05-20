@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ImageUp, ScanLine } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
@@ -22,6 +23,7 @@ export function TradeScanner({
   const scannerRef = useRef<import("qr-scanner").default | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scannedRef = useRef(false);
+  const cameraUnavailableToastShownRef = useRef(false);
   const [status, setStatus] = useState<ScannerStatus>("loading");
   const [messageKey, setMessageKey] =
     useState<ScannerMessageKey>("scanner.message.preparing");
@@ -60,6 +62,10 @@ export function TradeScanner({
         if (!cancelled) {
           setStatus("error");
           setMessageKey("scanner.message.cameraUnavailable");
+          if (!cameraUnavailableToastShownRef.current) {
+            cameraUnavailableToastShownRef.current = true;
+            toast.error(t(locale, "toast.scan.cameraUnavailable"));
+          }
         }
       }
     }
@@ -72,7 +78,7 @@ export function TradeScanner({
       scannerRef.current?.destroy();
       scannerRef.current = null;
     };
-  }, [onScan]);
+  }, [locale, onScan]);
 
   const scanImage = async (file: File) => {
     try {
@@ -84,6 +90,7 @@ export function TradeScanner({
     } catch {
       setStatus("error");
       setMessageKey("scanner.message.noQrFound");
+      toast.error(t(locale, "toast.scan.failed"));
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }

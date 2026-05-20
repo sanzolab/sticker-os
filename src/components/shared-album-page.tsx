@@ -4,6 +4,7 @@ import { ArrowLeft, Check, ExternalLink, Search, SlidersHorizontal, X } from "lu
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { AlbumTabPanel } from "@/components/album-tab-panel";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
@@ -25,6 +26,11 @@ import {
 } from "@/lib/shared-album-import";
 import { parseSharedAlbumLinkData, type SharedAlbumSnapshot } from "@/lib/shared-album-link";
 import { useStickerStore } from "@/lib/store";
+import {
+  cloneCollection,
+  hasCollectionChangedSinceExpected,
+  type CollectionSnapshotUndo,
+} from "@/lib/collection-snapshot-undo";
 import {
   buildTradeMatches,
   getLocalDuplicateIds,
@@ -72,6 +78,10 @@ export function SharedAlbumPage({ data }: { data?: string }) {
     | "trade.error.staleReceive"
     | null
   >(null);
+  const [exchangeUndoDialogOpen, setExchangeUndoDialogOpen] = useState(false);
+  const [pendingExchangeUndo, setPendingExchangeUndo] = useState<CollectionSnapshotUndo | null>(
+    null,
+  );
 
   useEffect(() => {
     let canceled = false;
@@ -372,6 +382,7 @@ export function SharedAlbumPage({ data }: { data?: string }) {
                   <Button
                     className="shadow-none"
                     onClick={() => {
+                      const previousCollection = cloneCollection(localCollection);
                       const result = applyTrade(selectedReceiveIds, selectedGiveIds);
                       if (!result.ok) {
                         setExchangeErrorKey(
@@ -381,8 +392,25 @@ export function SharedAlbumPage({ data }: { data?: string }) {
                               ? "trade.error.staleReceive"
                               : "trade.error.invalidSelection",
                         );
+                        toast.error(t(locale, "toast.exchange.failed"));
                         return;
                       }
+
+                      const expectedCurrentCollection = cloneCollection(
+                        useStickerStore.getState().collectionByStickerId,
+                      );
+                      setPendingExchangeUndo({
+                        beforeCollection: previousCollection,
+                        expectedCurrentCollection,
+                      });
+                      toast.success(t(locale, "toast.exchange.completed"), {
+                        action: {
+                          label: t(locale, "toast.action.undo"),
+                          onClick: () => {
+                            setExchangeUndoDialogOpen(true);
+                          },
+                        },
+                      });
 
                       setSelectedReceiveIds([]);
                       setSelectedGiveIds([]);
@@ -591,6 +619,55 @@ export function SharedAlbumPage({ data }: { data?: string }) {
           </Link>
         </Button>
       </div>
+      <AlertDialog
+        open={exchangeUndoDialogOpen}
+        onOpenChange={setExchangeUndoDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t(locale, "toast.exchange.undoTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingExchangeUndo &&
+              hasCollectionChangedSinceExpected({
+                currentCollection: localCollection,
+                expectedCurrentCollection: pendingExchangeUndo.expectedCurrentCollection,
+              })
+                ? t(locale, "toast.exchange.undoOverwriteDescription")
+                : t(locale, "toast.exchange.undoDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="secondary" className="shadow-none">
+                {t(locale, "common.cancel")}
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                className="shadow-none"
+                onClick={() => {
+                  if (!pendingExchangeUndo) {
+                    setExchangeUndoDialogOpen(false);
+                    return;
+                  }
+
+                  try {
+                    setCollectionByStickerId(pendingExchangeUndo.beforeCollection);
+                    setPendingExchangeUndo(null);
+                    setExchangeUndoDialogOpen(false);
+                    toast.success(t(locale, "toast.exchange.reverted"));
+                  } catch {
+                    toast.error(t(locale, "toast.exchange.revertFailed"));
+                  }
+                }}
+              >
+                {t(locale, "toast.exchange.undoConfirm")}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

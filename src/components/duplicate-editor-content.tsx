@@ -2,6 +2,7 @@
 
 import { Minus, Plus } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
@@ -71,7 +72,20 @@ export function DuplicateEditorContent({
         size="pill"
         className="w-full"
         onClick={() => {
-          setStickerCopies(sticker.id, duplicateDraft + 1);
+          const previousCopies = copies;
+          const nextCopies = duplicateDraft + 1;
+          setStickerCopies(sticker.id, nextCopies);
+          toast.success(t(locale, "toast.sticker.changesSaved"), {
+            action:
+              previousCopies !== nextCopies
+                ? {
+                    label: t(locale, "toast.action.undo"),
+                    onClick: () => {
+                      setStickerCopies(sticker.id, previousCopies);
+                    },
+                  }
+                : undefined,
+          });
           onOpenChange(false);
         }}
       >

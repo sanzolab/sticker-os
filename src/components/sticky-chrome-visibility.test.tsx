@@ -46,7 +46,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={1}
         isStickyActive={false}
@@ -69,7 +68,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0}
         isStickyActive
@@ -95,7 +93,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         tradeBadgeValue={null}
         hiddenProgress={0}
@@ -117,7 +114,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         tradeBadgeValue="!"
         hiddenProgress={0}
@@ -145,7 +141,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         tradeBadgeValue="7"
         hiddenProgress={0}
@@ -173,7 +168,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         tradeBadgeValue="120"
         hiddenProgress={0}
@@ -198,7 +192,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.6}
         isStickyActive
@@ -223,7 +216,6 @@ describe("sticky chrome visibility styles", () => {
     const { container, rerender } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.6}
         isStickyActive
@@ -241,7 +233,6 @@ describe("sticky chrome visibility styles", () => {
     rerender(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.5}
         isStickyActive
@@ -257,7 +248,6 @@ describe("sticky chrome visibility styles", () => {
     rerender(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.4}
         isStickyActive

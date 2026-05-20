@@ -3,8 +3,20 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StickerTile } from "./sticker-cell";
-import { stickers } from "@/lib/sticker-data";
+import { StickerCell, StickerTile } from "./sticker-cell";
+import { getCompactStickerCode, stickers } from "@/lib/sticker-data";
+import { useStickerStore } from "@/lib/store";
+
+const { toastMock, toastSuccessMock } = vi.hoisted(() => ({
+  toastMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: Object.assign(toastMock, {
+    success: toastSuccessMock,
+  }),
+}));
 
 const sticker = stickers.find((s) => !s.special && s.number) ?? stickers[0]!;
 const specialSticker = stickers.find((s) => s.special) ?? stickers[0]!;
@@ -13,6 +25,16 @@ describe("StickerTile", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    toastMock.mockReset();
+    toastSuccessMock.mockReset();
+    useStickerStore.setState((state) => ({
+      ...state,
+      collectionByStickerId: {},
+      settings: {
+        ...state.settings,
+        haptics: false,
+      },
+    }));
   });
 
   describe("visual states", () => {
@@ -200,5 +222,116 @@ describe("StickerTile", () => {
       expect(onTap).not.toHaveBeenCalled();
       expect(onLongPress).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("StickerCell", () => {
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    toastMock.mockReset();
+    toastSuccessMock.mockReset();
+    useStickerStore.setState((state) => ({
+      ...state,
+      collectionByStickerId: {},
+      settings: {
+        ...state.settings,
+        haptics: false,
+      },
+    }));
+  });
+
+  it("adds sticker and undo restores previous copies", async () => {
+    const user = userEvent.setup();
+    useStickerStore.setState((state) => ({
+      ...state,
+      collectionByStickerId: { [sticker.id]: 0 },
+      settings: {
+        ...state.settings,
+        haptics: false,
+        locale: "en",
+      },
+    }));
+
+    render(
+      <StickerCell
+        sticker={sticker}
+        onEditDuplicates={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button"));
+    expect(useStickerStore.getState().collectionByStickerId[sticker.id]).toBe(1);
+
+    const toastCall = toastSuccessMock.mock.calls.at(-1);
+    expect(toastCall).toBeTruthy();
+    const title = toastCall?.[0];
+    expect(title).toBeTruthy();
+
+    const code = getCompactStickerCode(sticker);
+    const { unmount } = render(<>{title}</>);
+    const chip = screen.getByTestId("sticker-toast-code-chip");
+    expect(chip.textContent).toBe(code);
+    expect(chip.className).toContain("border-emerald-500/35");
+    expect(chip.className).toContain("bg-emerald-500/15");
+    expect(chip.parentElement?.textContent).toBe(`Sticker ${code} added`);
+    unmount();
+
+    const action = toastCall?.[1]?.action;
+    expect(action?.label).toBe("Undo");
+    action?.onClick?.();
+
+    expect(useStickerStore.getState().collectionByStickerId[sticker.id]).toBeUndefined();
+  });
+
+  it("removes sticker on long press and undo restores previous copies", () => {
+    vi.useFakeTimers();
+    useStickerStore.setState((state) => ({
+      ...state,
+      collectionByStickerId: { [sticker.id]: 1 },
+      settings: {
+        ...state.settings,
+        haptics: false,
+        locale: "en",
+      },
+    }));
+
+    render(
+      <StickerCell
+        sticker={sticker}
+        onEditDuplicates={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button");
+    fireEvent.pointerDown(button);
+    vi.advanceTimersByTime(500);
+
+    expect(useStickerStore.getState().collectionByStickerId[sticker.id]).toBeUndefined();
+
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+    const toastCall = toastMock.mock.calls.at(-1);
+    expect(toastCall).toBeTruthy();
+    const title = toastCall?.[0];
+    expect(title).toBeTruthy();
+
+    const code = getCompactStickerCode(sticker);
+    const { unmount } = render(<>{title}</>);
+    const chip = screen.getByTestId("sticker-toast-code-chip");
+    expect(chip.textContent).toBe(code);
+    expect(chip.className).toContain("border-red-500/30");
+    expect(chip.className).toContain("bg-red-500/10");
+    expect(chip.parentElement?.textContent).toBe(`Sticker ${code} removed`);
+    unmount();
+
+    const options = toastCall?.[1];
+    expect(options?.className).toContain("border-red-500/25");
+    expect(options?.classNames?.actionButton).toContain("bg-red-700");
+
+    const action = options?.action;
+    expect(action?.label).toBe("Undo");
+    action?.onClick?.();
+
+    expect(useStickerStore.getState().collectionByStickerId[sticker.id]).toBe(1);
   });
 });
