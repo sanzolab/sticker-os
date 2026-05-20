@@ -67,9 +67,9 @@ export const StickerTile = memo(function StickerTile({
     !sticker.special && state === "owned" &&
       "rounded-sm border border-border/50 bg-primary/[0.06] text-foreground",
     sticker.special && state === "missing" &&
-      "rounded-sm border border-dashed border-amber-500/30! bg-transparent text-muted-foreground/40",
+      "rounded-sm border border-dashed !border-amber-300/60 bg-amber-50/15 text-amber-700/45 hover:!border-amber-300/80 hover:bg-amber-50/25 dark:!border-amber-500/30 dark:bg-transparent dark:text-muted-foreground/40 dark:hover:!border-amber-500/30 dark:hover:bg-transparent",
     sticker.special && state === "owned" &&
-      "rounded-sm border  border-amber-400/40! bg-amber-950/20 text-amber-300",
+      "rounded-sm border !border-amber-300/80 bg-amber-100/70 text-amber-700 hover:!border-amber-400/80 hover:bg-amber-100/85 dark:!border-amber-400/40 dark:bg-amber-950/20 dark:text-amber-300 dark:hover:!border-amber-400/40 dark:hover:bg-amber-950/20",
   );
 
   const cellStyle =
@@ -92,7 +92,7 @@ export const StickerTile = memo(function StickerTile({
         <span className="absolute bottom-[6px] md:bottom-2 size-1.5 rounded-full border" />
       )}
       {state === "missing" && sticker.special && (
-        <SpecialStickerMark className="absolute bottom-[6px] md:bottom-1.5 size-2.5" />
+        <SpecialStickerMark className="absolute bottom-[6px] md:bottom-1.5 size-2.5 text-amber-300/60 dark:text-amber-500/30" />
       )}
 
       {copies > 1 && (

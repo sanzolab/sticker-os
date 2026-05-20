@@ -1,4 +1,4 @@
-const CACHE_NAME = "stickeros-shell-v1.8.3.6";
+const CACHE_NAME = "stickeros-shell-v1.8.3.7";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
