@@ -9,6 +9,7 @@ import { AddStickersDrawer } from "@/components/features/add-stickers/add-sticke
 import { ShareDrawer } from "@/components/share-drawer";
 import { SettingsDrawer } from "@/components/settings-drawer";
 import { StatsDrawer } from "@/components/stats-drawer";
+import { AlbumMigrationDrawer } from "@/components/album-migration-drawer";
 import { StickyControls, albumTabs, type AlbumTab } from "@/components/sticky-controls";
 import { TopBar } from "@/components/top-bar";
 import { TradeDrawer } from "@/components/trade-drawer";
@@ -30,6 +31,7 @@ const STICKY_SAFETY_BUFFER_PX = 8;
 
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [migrationOpen, setMigrationOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -270,8 +272,13 @@ export function StickerOSApp() {
       <SettingsDrawer
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+        onOpenMigration={() => setMigrationOpen(true)}
         collectionName={collectionName}
         collectionByStickerId={collectionByStickerId}
+      />
+      <AlbumMigrationDrawer
+        open={migrationOpen}
+        onOpenChange={setMigrationOpen}
       />
       <ShareDrawer
         open={shareOpen}

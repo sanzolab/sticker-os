@@ -68,6 +68,10 @@ const translations = {
     "settings.export.title": "Export",
     "settings.export.copyTxt": "Copy TXT",
     "settings.export.download": "Download",
+    "settings.migration.title": "Migration",
+    "settings.migration.description":
+      "Import album progress from another app using an exchange QR code.",
+    "settings.migration.button": "Migrate album from another app",
     "settings.reset.title": "Collection Reset",
     "settings.reset.description":
       "Clear all local sticker progress and duplicate counts.",
@@ -136,6 +140,7 @@ const translations = {
     "toast.reset.reverted": "Album restored",
     "toast.reset.revertFailed": "Could not restore album",
     "toast.import.completed": "Album imported",
+    "toast.migration.completed": "Album migrated successfully.",
     "export.kind.missing": "Missing",
     "export.kind.duplicates": "Duplicate",
     "export.kind.both": "Both",
@@ -383,6 +388,33 @@ const translations = {
       "No readable StickerOS QR was found in that image.",
     "scanner.overlay.preparing": "Preparing camera",
     "scanner.upload": "Upload QR Image",
+    "migration.title": "Migrate album from another app",
+    "migration.description":
+      "Scan an exchange QR code to import progress into this device.",
+    "migration.warning.replace":
+      "Importing from another app will replace your current album progress.",
+    "migration.warning.loss":
+      "If you already have saved progress, it will be lost.",
+    "migration.warning.duplicatesTitle": "Duplicate quantity limitation",
+    "migration.warning.duplicatesBody":
+      "The QR code only tells us which stickers/cards are repeated, but not how many copies you have. Any repeated sticker/card found in the QR will be imported as 1 extra copy only.",
+    "migration.startScan": "I understand, continue to scan",
+    "migration.back": "Back",
+    "migration.scanTitle": "Scan exchange QR",
+    "migration.scanDescription":
+      "Use your camera or upload an image with the exchange QR code.",
+    "migration.error.invalidQr":
+      "This QR code could not be used to migrate your album. Please check that it is a valid exchange QR.",
+    "migration.reviewTitle": "Review migration data",
+    "migration.reviewDescription":
+      "Confirm the scanned data before replacing your local album.",
+    "migration.summary.collected": "Stickers/cards marked as collected",
+    "migration.summary.duplicates": "Stickers/cards marked as repeated",
+    "migration.summary.ignored": "Unsupported stickers/cards ignored",
+    "migration.confirmTitle": "Migrate album now?",
+    "migration.confirmDescription":
+      "Are you sure you want to migrate your album? This will overwrite your current progress.",
+    "migration.confirmAction": "Migrate album",
     "duplicate.title": "Edit duplicates",
     "duplicate.description": "Set extra copies for {group}.",
     "duplicate.decrease": "Decrease duplicates",
@@ -458,6 +490,10 @@ const translations = {
     "settings.export.title": "Exportar",
     "settings.export.copyTxt": "Copiar TXT",
     "settings.export.download": "Descargar",
+    "settings.migration.title": "Migración",
+    "settings.migration.description":
+      "Importa el progreso del álbum desde otra app usando un QR de intercambio.",
+    "settings.migration.button": "Migrar álbum desde otra app",
     "settings.reset.title": "Restablecer colección",
     "settings.reset.description":
       "Borra todo el progreso local y los duplicados.",
@@ -527,6 +563,7 @@ const translations = {
     "toast.reset.reverted": "Álbum restaurado",
     "toast.reset.revertFailed": "No se pudo restaurar el álbum",
     "toast.import.completed": "Álbum importado",
+    "toast.migration.completed": "Álbum migrado correctamente.",
     "export.kind.missing": "Faltantes",
     "export.kind.duplicates": "Repetidas",
     "export.kind.both": "Ambas",
@@ -777,6 +814,33 @@ const translations = {
       "No se encontró un QR legible de StickerOS en esa imagen.",
     "scanner.overlay.preparing": "Preparando cámara",
     "scanner.upload": "Subir imagen del QR",
+    "migration.title": "Migrar álbum desde otra app",
+    "migration.description":
+      "Escanea un QR de intercambio para importar el progreso en este dispositivo.",
+    "migration.warning.replace":
+      "Importar desde otra app reemplazará el progreso actual de tu álbum.",
+    "migration.warning.loss":
+      "Si ya tienes progreso guardado, se perderá.",
+    "migration.warning.duplicatesTitle": "Límite en cantidades repetidas",
+    "migration.warning.duplicatesBody":
+      "El código QR solo indica qué figuritas/tarjetas están repetidas, pero no cuántas copias tienes. Cualquier figurita/tarjeta repetida encontrada en el QR se importará como solo 1 copia extra.",
+    "migration.startScan": "Entiendo, continuar para escanear",
+    "migration.back": "Volver",
+    "migration.scanTitle": "Escanear QR de intercambio",
+    "migration.scanDescription":
+      "Usa la cámara o sube una imagen con el QR de intercambio.",
+    "migration.error.invalidQr":
+      "Este código QR no se pudo usar para migrar tu álbum. Verifica que sea un QR de intercambio válido.",
+    "migration.reviewTitle": "Revisar datos de migración",
+    "migration.reviewDescription":
+      "Confirma los datos escaneados antes de reemplazar tu álbum local.",
+    "migration.summary.collected": "Figuritas/tarjetas marcadas como conseguidas",
+    "migration.summary.duplicates": "Figuritas/tarjetas marcadas como repetidas",
+    "migration.summary.ignored": "Figuritas/tarjetas no compatibles ignoradas",
+    "migration.confirmTitle": "¿Migrar álbum ahora?",
+    "migration.confirmDescription":
+      "¿Seguro que quieres migrar tu álbum? Esto sobrescribirá tu progreso actual.",
+    "migration.confirmAction": "Migrar álbum",
     "duplicate.title": "Editar repetidas",
     "duplicate.description": "Define copias extra para {group}.",
     "duplicate.decrease": "Disminuir repetidas",

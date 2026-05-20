@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Download, RotateCcw } from "lucide-react";
+import { Copy, Download, RefreshCw, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -24,11 +24,13 @@ import { SettingRow } from "./setting-row";
 export function SettingsDrawer({
   open,
   onOpenChange,
+  onOpenMigration,
   collectionName,
   collectionByStickerId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenMigration: () => void;
   collectionName: string;
   collectionByStickerId: Record<string, number>;
 }) {
@@ -205,6 +207,28 @@ export function SettingsDrawer({
               {t(locale, "settings.export.download")}
             </Button>
           </div>
+        </div>
+        <div className="space-y-3 border-t pt-4">
+          <div>
+            <p className="text-sm font-medium">
+              {t(locale, "settings.migration.title")}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t(locale, "settings.migration.description")}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="pill"
+            className="w-full shadow-none"
+            onClick={() => {
+              onOpenChange(false);
+              onOpenMigration();
+            }}
+          >
+            <RefreshCw className="size-4" />
+            {t(locale, "settings.migration.button")}
+          </Button>
         </div>
         <div className="space-y-3 border-t pt-4">
           <div>

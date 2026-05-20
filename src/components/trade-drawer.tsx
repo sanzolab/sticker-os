@@ -12,7 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import { stickers, stickersByStickerOsIndex } from "@/lib/sticker-data";
+import { stickers } from "@/lib/sticker-data";
+import {
+  parseExchangeQrPayload,
+  type ExchangeQrMessageKey,
+} from "@/lib/exchange-qr";
 import { useStickerStore } from "@/lib/store";
 import { useTradeSessionStore } from "@/lib/trade-session";
 import {
@@ -27,9 +31,7 @@ import {
   previewTradeImpact,
 } from "@/lib/trade";
 import {
-  parseTradeQrPayload,
   sanitizeTradeDisplayName,
-  type TradeQrParseError,
 } from "@/lib/trade-qr";
 import { t } from "@/lib/i18n";
 import { TradeScanner } from "./trade-scanner";
@@ -131,7 +133,7 @@ export function TradeDrawer({
       const controller = new AbortController();
       scanAbortRef.current = controller;
 
-      const parsed = await parseScannedTradeQr(value, controller.signal);
+      const parsed = await parseExchangeQrPayload(value, controller.signal);
 
       if (controller.signal.aborted) return;
       scanAbortRef.current = null;
@@ -151,12 +153,12 @@ export function TradeDrawer({
       const matches = buildTradeMatches({
         localMissingIds: getLocalMissingIds(collectionByStickerId),
         localDuplicateIds: getLocalDuplicateIds(collectionByStickerId),
-        remoteMissingIds: parsed.missingIds,
-        remoteDuplicateIds: parsed.duplicateIds,
+        remoteMissingIds: parsed.payload.missingIds,
+        remoteDuplicateIds: parsed.payload.duplicateIds,
       });
 
       setTradeResult({
-        remoteName: parsed.name || "",
+        remoteName: parsed.payload.name || "",
         receiveIds: matches.receiveIds,
         giveIds: matches.giveIds,
       });
@@ -688,25 +690,8 @@ type StickerOsIndexes = {
   duplicateIndexes: number[];
 };
 
-type StickerOsDecodeResponse = {
-  format: "stickeros";
-  ownedIndexes: number[];
-  duplicateIndexes: number[];
-};
-
-type ParsedScannedTradeQr =
-  | {
-      ok: true;
-      name: string;
-      missingIds: string[];
-      duplicateIds: string[];
-    }
-  | {
-      ok: false;
-      errorKey: TradeMessageKey;
-    };
-
 export type TradeMessageKey =
+  | ExchangeQrMessageKey
   | "trade.error.invalidCollection"
   | "trade.error.invalidLength"
   | "trade.error.invalidHash"
@@ -751,88 +736,4 @@ export async function requestStickerOsQrEncode(
   if (!body.qr) throw new Error("StickerOS QR response did not include qr");
 
   return body.qr;
-}
-
-async function parseScannedTradeQr(
-  value: string,
-  signal?: AbortSignal,
-): Promise<ParsedScannedTradeQr> {
-  if (signal?.aborted) {
-    return { ok: false, errorKey: "trade.error.invalidQr" };
-  }
-
-  const stickerOs = await requestStickerOsQrDecode(value, signal);
-
-  if (signal?.aborted) {
-    return { ok: false, errorKey: "trade.error.invalidQr" };
-  }
-
-  if (stickerOs.ok) {
-    const owned = new Set(stickerOs.payload.ownedIndexes);
-
-    return {
-      ok: true,
-      name: "",
-      missingIds: stickers
-        .filter((sticker) => !owned.has(sticker.stickerOsIndex))
-        .map((sticker) => sticker.id),
-      duplicateIds: stickerOs.payload.duplicateIndexes
-        .map((index) => stickersByStickerOsIndex[index]?.id)
-        .filter((id): id is string => Boolean(id)),
-    };
-  }
-
-  const legacy = parseTradeQrPayload(value);
-
-  if (!legacy.ok) {
-    return { ok: false, errorKey: getTradeParseMessageKey(legacy.reason) };
-  }
-
-  return {
-    ok: true,
-    name: legacy.payload.name,
-    missingIds: legacy.payload.missingIds,
-    duplicateIds: legacy.payload.duplicateIds,
-  };
-}
-
-async function requestStickerOsQrDecode(
-  value: string,
-  signal?: AbortSignal,
-): Promise<
-  | { ok: true; payload: StickerOsDecodeResponse }
-  | { ok: false }
-> {
-  try {
-    const response = await fetch("/api/stickeros/qr", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "decode", qr: value }),
-      signal,
-    });
-
-    if (!response.ok) return { ok: false };
-
-    return {
-      ok: true,
-      payload: (await response.json()) as StickerOsDecodeResponse,
-    };
-  } catch {
-    return { ok: false };
-  }
-}
-
-function getTradeParseMessageKey(reason: TradeQrParseError): TradeMessageKey {
-  switch (reason) {
-    case "invalid-collection":
-    case "invalid-length":
-    case "invalid-hash":
-      return "trade.error.invalidCollection";
-    case "invalid-version":
-      return "trade.error.invalidVersion";
-    case "invalid-bitset":
-      return "trade.error.invalidBitset";
-    default:
-      return "trade.error.invalidQr";
-  }
 }
