@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  CircleDashed,
+  CircleDot,
+  Repeat2,
+  Shield,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { AnimatedTabPanel } from "@/components/ui/animated-tab-panel";
 import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { Button } from "@/components/ui/button";
-import { DataGrid } from "@/components/data-grid";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { TabSlider } from "@/components/ui/tab-slider";
-import { t, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
 import { getStickerCopies, stickerGroups, stickers } from "@/lib/sticker-data";
 import { ProgressRing } from "./progress-ring";
@@ -33,10 +40,6 @@ export function StatsDrawer({
   const [activeTab, setActiveTab] = useState<StatsTab>("summary");
   const [teamSort, setTeamSort] = useState<TeamSortMode>("most");
   const locale = useStickerStore((state) => state.settings.locale);
-  const items = useMemo(
-    () => (open ? mapStatsToItems(locale, stats) : []),
-    [locale, open, stats],
-  );
   const tabs = useMemo(
     () => [
       { id: "summary", label: t(locale, "stats.tabs.summary") },
@@ -88,11 +91,56 @@ export function StatsDrawer({
         </DrawerDescription>
       </div>
 
-      <div className="grid grid-cols-[6rem_1fr] rounded-sm border text-sm">
-        <div className="grid place-items-center border-r p-2">
-          <ProgressRing value={stats.completion} size="default" />
+      <div className="overflow-hidden rounded-sm border bg-card text-sm">
+        <div className="grid grid-cols-[6rem_1fr] divide-x">
+          <div className="grid place-items-center p-3">
+            <ProgressRing value={stats.completion} size="default" />
+          </div>
+          <div className="min-w-0 p-3 sm:p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {t(locale, "stats.overview.title")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold leading-none sm:text-3xl">
+              {stats.collected}/{stats.total}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t(locale, "stats.overview.remaining", { count: stats.missing })}
+            </p>
+          </div>
         </div>
-        <DataGrid items={items} cols={3} />
+
+        <div className="border-t">
+          <div className="px-3 pt-3 sm:px-4">
+            <DrawerSectionTitle title={t(locale, "stats.group.quickStats")} />
+          </div>
+          <div className="mt-2 grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <DrawerMetricCell
+              icon={
+                <CircleDashed
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              }
+              label={t(locale, "collection.missing")}
+              value={stats.missing}
+              helper={t(locale, "stats.metric.missingHelp")}
+            />
+            <DrawerMetricCell
+              icon={<Repeat2 className="size-4 text-primary" aria-hidden="true" />}
+              label={t(locale, "collection.duplicates")}
+              value={stats.duplicateCopies}
+              helper={t(locale, "stats.metric.duplicatesHelp")}
+              accent="primary"
+            />
+            <DrawerMetricCell
+              icon={<Sparkles className="size-4 text-yellow-400" aria-hidden="true" />}
+              label={t(locale, "collection.special")}
+              value={`${stats.specialCollected}/${stats.specialTotal}`}
+              helper={t(locale, "stats.metric.specialHelp")}
+              accent="special"
+            />
+          </div>
+        </div>
       </div>
 
       <AnimatedTabs
@@ -115,22 +163,30 @@ export function StatsDrawer({
           active={activeTab === "summary"}
           className="space-y-3"
         >
+          <DrawerSectionTitle
+            title={t(locale, "stats.group.breakdown")}
+            description={t(locale, "stats.group.breakdownHelp")}
+          />
           <ProgressRow
+            icon={<CircleDot className="size-4 text-primary" />}
             label={t(locale, "stats.summary.albumCompletion")}
             value={stats.completion}
             detail={`${stats.collected}/${stats.total}`}
           />
           <ProgressRow
+            icon={<Sparkles className="size-4 text-yellow-400" />}
             label={t(locale, "stats.summary.specialCompletion")}
             value={percentage(stats.specialCollected, stats.specialTotal)}
             detail={`${stats.specialCollected}/${stats.specialTotal}`}
           />
           <ProgressRow
+            icon={<Users className="size-4 text-muted-foreground" />}
             label={t(locale, "stats.summary.teams")}
             value={percentage(stats.teamCollected, stats.teamTotal)}
             detail={`${stats.teamCollected}/${stats.teamTotal}`}
           />
           <ProgressRow
+            icon={<Shield className="size-4 text-muted-foreground" />}
             label={t(locale, "stats.summary.shields")}
             value={percentage(stats.shieldCollected, stats.shieldTotal)}
             detail={`${stats.shieldCollected}/${stats.shieldTotal}`}
@@ -143,6 +199,10 @@ export function StatsDrawer({
           active={activeTab === "teams"}
           className="space-y-3"
         >
+          <DrawerSectionTitle
+            title={t(locale, "stats.tabs.teams")}
+            description={t(locale, "stats.group.teamHelp")}
+          />
           <Button
             variant="outline"
             size="sm"
@@ -164,30 +224,63 @@ export function StatsDrawer({
   );
 }
 
-function mapStatsToItems(
-  locale: Locale,
-  stats: ReturnType<typeof useCollectionStats>,
-) {
-  return [
-    { label: t(locale, "collection.ratio"), value: `${stats.collected}/${stats.total}` },
-    { label: t(locale, "collection.percent"), value: `${stats.completion}%` },
-    { label: t(locale, "collection.total"), value: stats.total },
-    { label: t(locale, "collection.collected"), value: stats.collected },
-    { label: t(locale, "collection.missing"), value: stats.missing },
-    { label: t(locale, "collection.duplicates"), value: stats.duplicateCopies },
-    {
-      label: t(locale, "collection.special"),
-      value: `${stats.specialCollected}/${stats.specialTotal}`,
-    },
-    {
-      label: t(locale, "stats.summary.teams"),
-      value: `${stats.teamCollected}/${stats.teamTotal}`,
-    },
-    {
-      label: t(locale, "stats.summary.shields"),
-      value: `${stats.shieldCollected}/${stats.shieldTotal}`,
-    },
-  ];
+function DrawerSectionTitle({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
+      {description ? (
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function DrawerMetricCell({
+  icon,
+  label,
+  value,
+  helper,
+  accent = "neutral",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string | number;
+  helper: string;
+  accent?: "neutral" | "primary" | "special";
+}) {
+  const accentClassName =
+    accent === "primary"
+      ? "border-primary/25 bg-primary/10"
+      : accent === "special"
+        ? "border-yellow-500/25 bg-yellow-500/10"
+        : "border-border bg-muted/50";
+
+  return (
+    <div className="min-w-0 p-3 sm:p-4">
+      <div className="flex items-start gap-3">
+        <span
+          className={`mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-sm border ${accentClassName}`}
+        >
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-1 text-xl font-semibold leading-none">{value}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function buildTeamProgress(collectionByStickerId: Record<string, number>) {
@@ -206,6 +299,7 @@ function buildTeamProgress(collectionByStickerId: Record<string, number>) {
         code: group.countryCode ?? group.id.toUpperCase(),
         flag: group.flag ?? "",
         label: group.label,
+        name: group.name,
         collected,
         total,
         percent: percentage(collected, total),

@@ -7,7 +7,6 @@ import { useSectionLifecycle } from "@/components/use-section-lifecycle";
 import { getSectionLifecycleRegistry } from "@/lib/section-lifecycle";
 import { t } from "@/lib/i18n";
 import {
-  getStickerGroupLabel,
   type Sticker,
   type StickerGroup,
 } from "@/lib/sticker-data";
@@ -90,7 +89,7 @@ export const StickerSection = memo(function StickerSection({
           >
             <header>
               <h2 className="text-lg font-semibold tracking-normal">
-                {getStickerGroupLabel(group, locale)}
+                {group.emoji ?? group.flag ?? ""} {group.code} - {group.name}
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {duplicates > 0

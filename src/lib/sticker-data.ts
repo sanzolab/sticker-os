@@ -27,6 +27,9 @@ export type StickerGroup = {
   category: StickerCategory;
   countryCode?: string;
   flag?: string;
+  code: string;
+  name: string;
+  emoji?: string;
 };
 
 export type Sticker = {
@@ -48,6 +51,9 @@ export type Sticker = {
 const fwcGroups: StickerGroup[] = [
   {
     id: "fwc-trophy",
+    code: "FWC",
+    name: "Specials",
+    emoji: "🏆",
     label: "FWC - Specials 🏆",
     exportLabel: "FWC - Specials 🏆",
     labels: {
@@ -62,6 +68,9 @@ const fwcGroups: StickerGroup[] = [
   },
   {
     id: "fwc-world",
+    code: "FWC",
+    name: "Ball and Countries",
+    emoji: "🌎",
     label: "FWC - Ball and Countries 🌎",
     exportLabel: "FWC - Ball and Countries 🌎",
     labels: {
@@ -76,6 +85,9 @@ const fwcGroups: StickerGroup[] = [
   },
   {
     id: "fwc-history",
+    code: "FWC",
+    name: "History",
+    emoji: "📜",
     label: "FWC - History 📜",
     exportLabel: "FWC - History 📜",
     labels: {
@@ -93,8 +105,11 @@ const fwcGroups: StickerGroup[] = [
 const ccGroups: StickerGroup[] = [
   {
     id: "cc",
-    label: "CC - COCA COLA 🥤",
-    exportLabel: "CC - COCA COLA 🥤",
+    code: "CC",
+    name: "Coca Cola",
+    emoji: "🥤",
+    label: "CC - Coca Cola 🥤",
+    exportLabel: "CC - Coca Cola 🥤",
     category: "cc",
   },
 ];
@@ -107,6 +122,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "MEX",
     flag: "🇲🇽",
+    code: "MEX",
+    name: "Mexico",
+    emoji: "🇲🇽",
   },
   {
     id: "rsa",
@@ -115,6 +133,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "RSA",
     flag: "🇿🇦",
+    code: "RSA",
+    name: "South Africa",
+    emoji: "🇿🇦",
   },
   {
     id: "kor",
@@ -123,6 +144,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "KOR",
     flag: "🇰🇷",
+    code: "KOR",
+    name: "South Korea",
+    emoji: "🇰🇷",
   },
   {
     id: "cze",
@@ -131,6 +155,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "CZE",
     flag: "🇨🇿",
+    code: "CZE",
+    name: "Czechia",
+    emoji: "🇨🇿",
   },
   {
     id: "can",
@@ -139,6 +166,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "CAN",
     flag: "🇨🇦",
+    code: "CAN",
+    name: "Canada",
+    emoji: "🇨🇦",
   },
   {
     id: "bih",
@@ -147,6 +177,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "BIH",
     flag: "🇧🇦",
+    code: "BIH",
+    name: "Bosnia and Herzegovina",
+    emoji: "🇧🇦",
   },
   {
     id: "qat",
@@ -155,6 +188,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "QAT",
     flag: "🇶🇦",
+    code: "QAT",
+    name: "Qatar",
+    emoji: "🇶🇦",
   },
   {
     id: "sui",
@@ -163,6 +199,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "SUI",
     flag: "🇨🇭",
+    code: "SUI",
+    name: "Switzerland",
+    emoji: "🇨🇭",
   },
   {
     id: "bra",
@@ -171,6 +210,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "BRA",
     flag: "🇧🇷",
+    code: "BRA",
+    name: "Brazil",
+    emoji: "🇧🇷",
   },
   {
     id: "mar",
@@ -179,6 +221,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "MAR",
     flag: "🇲🇦",
+    code: "MAR",
+    name: "Morocco",
+    emoji: "🇲🇦",
   },
   {
     id: "hai",
@@ -187,6 +232,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "HAI",
     flag: "🇭🇹",
+    code: "HAI",
+    name: "Haiti",
+    emoji: "🇭🇹",
   },
   {
     id: "sco",
@@ -195,6 +243,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "SCO",
     flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+    code: "SCO",
+    name: "Scotland",
+    emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
   },
   {
     id: "usa",
@@ -203,6 +254,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "USA",
     flag: "🇺🇸",
+    code: "USA",
+    name: "United States",
+    emoji: "🇺🇸",
   },
   {
     id: "par",
@@ -211,6 +265,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "PAR",
     flag: "🇵🇾",
+    code: "PAR",
+    name: "Paraguay",
+    emoji: "🇵🇾",
   },
   {
     id: "aus",
@@ -219,6 +276,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "AUS",
     flag: "🇦🇺",
+    code: "AUS",
+    name: "Australia",
+    emoji: "🇦🇺",
   },
   {
     id: "tur",
@@ -227,6 +287,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "TUR",
     flag: "🇹🇷",
+    code: "TUR",
+    name: "Turkey",
+    emoji: "🇹🇷",
   },
   {
     id: "ger",
@@ -235,6 +298,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "GER",
     flag: "🇩🇪",
+    code: "GER",
+    name: "Germany",
+    emoji: "🇩🇪",
   },
   {
     id: "cuw",
@@ -243,6 +309,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "CUW",
     flag: "🇨🇼",
+    code: "CUW",
+    name: "Curacao",
+    emoji: "🇨🇼",
   },
   {
     id: "civ",
@@ -251,6 +320,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "CIV",
     flag: "🇨🇮",
+    code: "CIV",
+    name: "Cote d'Ivoire",
+    emoji: "🇨🇮",
   },
   {
     id: "ecu",
@@ -259,6 +331,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "ECU",
     flag: "🇪🇨",
+    code: "ECU",
+    name: "Ecuador",
+    emoji: "🇪🇨",
   },
   {
     id: "ned",
@@ -267,6 +342,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "NED",
     flag: "🇳🇱",
+    code: "NED",
+    name: "Netherlands",
+    emoji: "🇳🇱",
   },
   {
     id: "jpn",
@@ -275,6 +353,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "JPN",
     flag: "🇯🇵",
+    code: "JPN",
+    name: "Japan",
+    emoji: "🇯🇵",
   },
   {
     id: "swe",
@@ -283,6 +364,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "SWE",
     flag: "🇸🇪",
+    code: "SWE",
+    name: "Sweden",
+    emoji: "🇸🇪",
   },
   {
     id: "tun",
@@ -291,6 +375,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "TUN",
     flag: "🇹🇳",
+    code: "TUN",
+    name: "Tunisia",
+    emoji: "🇹🇳",
   },
   {
     id: "bel",
@@ -299,6 +386,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "BEL",
     flag: "🇧🇪",
+    code: "BEL",
+    name: "Belgium",
+    emoji: "🇧🇪",
   },
   {
     id: "egy",
@@ -307,6 +397,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "EGY",
     flag: "🇪🇬",
+    code: "EGY",
+    name: "Egypt",
+    emoji: "🇪🇬",
   },
   {
     id: "irn",
@@ -315,6 +408,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "IRN",
     flag: "🇮🇷",
+    code: "IRN",
+    name: "Iran",
+    emoji: "🇮🇷",
   },
   {
     id: "nzl",
@@ -323,6 +419,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "NZL",
     flag: "🇳🇿",
+    code: "NZL",
+    name: "New Zealand",
+    emoji: "🇳🇿",
   },
   {
     id: "esp",
@@ -331,6 +430,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "ESP",
     flag: "🇪🇸",
+    code: "ESP",
+    name: "Spain",
+    emoji: "🇪🇸",
   },
   {
     id: "cpv",
@@ -339,6 +441,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "CPV",
     flag: "🇨🇻",
+    code: "CPV",
+    name: "Cape Verde",
+    emoji: "🇨🇻",
   },
   {
     id: "ksa",
@@ -347,6 +452,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "KSA",
     flag: "🇸🇦",
+    code: "KSA",
+    name: "Saudi Arabia",
+    emoji: "🇸🇦",
   },
   {
     id: "uru",
@@ -355,6 +463,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "URU",
     flag: "🇺🇾",
+    code: "URU",
+    name: "Uruguay",
+    emoji: "🇺🇾",
   },
   {
     id: "fra",
@@ -363,6 +474,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "FRA",
     flag: "🇫🇷",
+    code: "FRA",
+    name: "France",
+    emoji: "🇫🇷",
   },
   {
     id: "sen",
@@ -371,6 +485,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "SEN",
     flag: "🇸🇳",
+    code: "SEN",
+    name: "Senegal",
+    emoji: "🇸🇳",
   },
   {
     id: "irq",
@@ -379,6 +496,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "IRQ",
     flag: "🇮🇶",
+    code: "IRQ",
+    name: "Iraq",
+    emoji: "🇮🇶",
   },
   {
     id: "nor",
@@ -387,6 +507,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "NOR",
     flag: "🇳🇴",
+    code: "NOR",
+    name: "Norway",
+    emoji: "🇳🇴",
   },
   {
     id: "arg",
@@ -395,6 +518,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "ARG",
     flag: "🇦🇷",
+    code: "ARG",
+    name: "Argentina",
+    emoji: "🇦🇷",
   },
   {
     id: "alg",
@@ -403,6 +529,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "ALG",
     flag: "🇩🇿",
+    code: "ALG",
+    name: "Algeria",
+    emoji: "🇩🇿",
   },
   {
     id: "aut",
@@ -411,6 +540,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "AUT",
     flag: "🇦🇹",
+    code: "AUT",
+    name: "Austria",
+    emoji: "🇦🇹",
   },
   {
     id: "jor",
@@ -419,6 +551,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "JOR",
     flag: "🇯🇴",
+    code: "JOR",
+    name: "Jordan",
+    emoji: "🇯🇴",
   },
   {
     id: "por",
@@ -427,6 +562,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "POR",
     flag: "🇵🇹",
+    code: "POR",
+    name: "Portugal",
+    emoji: "🇵🇹",
   },
   {
     id: "cod",
@@ -435,6 +573,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "COD",
     flag: "🇨🇩",
+    code: "COD",
+    name: "DR Congo",
+    emoji: "🇨🇩",
   },
   {
     id: "uzb",
@@ -443,6 +584,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "UZB",
     flag: "🇺🇿",
+    code: "UZB",
+    name: "Uzbekistan",
+    emoji: "🇺🇿",
   },
   {
     id: "col",
@@ -451,6 +595,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "COL",
     flag: "🇨🇴",
+    code: "COL",
+    name: "Colombia",
+    emoji: "🇨🇴",
   },
   {
     id: "eng",
@@ -459,6 +606,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "ENG",
     flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    code: "ENG",
+    name: "England",
+    emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   },
   {
     id: "cro",
@@ -467,6 +617,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "CRO",
     flag: "🇭🇷",
+    code: "CRO",
+    name: "Croatia",
+    emoji: "🇭🇷",
   },
   {
     id: "gha",
@@ -475,6 +628,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "GHA",
     flag: "🇬🇭",
+    code: "GHA",
+    name: "Ghana",
+    emoji: "🇬🇭",
   },
   {
     id: "pan",
@@ -483,6 +639,9 @@ const countryGroups: StickerGroup[] = [
     category: "country",
     countryCode: "PAN",
     flag: "🇵🇦",
+    code: "PAN",
+    name: "Panama",
+    emoji: "🇵🇦",
   },
 ];
 
@@ -590,18 +749,20 @@ export function getCompactStickerLabel(
   locale: Locale,
 ): CompactStickerLabel {
   if (sticker.category === "fwc") {
+    const group = stickerGroupsById[sticker.groupId];
     return {
       primary: "FWC",
       secondary: sticker.number,
-      detail: getCompactGroupDetail(getStickerGroupLabelById(sticker.groupId, locale), "FWC"),
+      detail: group ? getCompactGroupDetail(group, locale) : "FWC",
     };
   }
 
   if (sticker.category === "cc") {
+    const group = stickerGroupsById[sticker.groupId];
     return {
       primary: "CC",
       secondary: sticker.number,
-      detail: getCompactGroupDetail(getStickerGroupLabelById(sticker.groupId, locale), "CC"),
+      detail: group ? getCompactGroupDetail(group, locale) : "CC",
     };
   }
 
@@ -610,10 +771,10 @@ export function getCompactStickerLabel(
   return {
     primary: code,
     secondary: sticker.number,
-    detail: getCountryDisplayName(code, locale) ?? getCompactGroupDetail(
-      getStickerGroupLabelById(sticker.groupId, locale),
-      code,
-    ),
+    detail: getCountryDisplayName(code, locale) ?? (() => {
+      const group = stickerGroupsById[sticker.groupId];
+      return group ? getCompactGroupDetail(group, locale) : code;
+    })(),
   };
 }
 
@@ -650,6 +811,7 @@ export function getStickerSearchValues(sticker: Sticker, locale: Locale) {
       getStickerExportLabel(group, locale),
       getStickerGroupLabel(group, "en"),
       getStickerExportLabel(group, "en"),
+      group.name,
     );
   }
 
@@ -665,7 +827,7 @@ function makeFwcSticker(
     id: `${group.id}-${number}`,
     stickerOsIndex: getStickerOsIndex(`FWC ${number}`),
     number,
-    code: `${group.exportLabel} ${number}`,
+    code: `FWC ${number}`,
     title: `${group.label} ${number}`,
     groupId: group.id,
     groupLabel: group.label,
@@ -694,7 +856,7 @@ const ccStickers: Sticker[] = Array.from({ length: 14 }, (_, index) => {
     id: `CC${number}`,
     stickerOsIndex: getStickerOsIndex(`CC ${number}`),
     number,
-    code: `CC${number}`,
+    code: `CC ${number}`,
     title: `CC sponsor ${number}`,
     groupId: ccGroups[0].id,
     groupLabel: ccGroups[0].label,
@@ -715,7 +877,7 @@ const countryStickers: Sticker[] = countryGroups.flatMap((group) =>
       id: `${group.countryCode}${number}`,
       stickerOsIndex: getStickerOsIndex(`${group.countryCode} ${number}`),
       number,
-      code: `${group.countryCode}${number}`,
+      code: `${group.countryCode} ${number}`,
       title:
         kind === "shield"
           ? `${group.countryCode} shield`
@@ -786,12 +948,15 @@ function getCountryDisplayName(code: string, locale: Locale) {
   return names?.[locale] ?? names?.en;
 }
 
-function getCompactGroupDetail(label: string, code: string) {
-  const withoutEmoji = label.replace(/\p{Extended_Pictographic}/gu, "");
+function getCompactGroupDetail(group: StickerGroup, locale: Locale) {
+  const label = getStickerGroupLabel(group, locale);
+  const withoutEmoji = group.emoji
+    ? label.replace(new RegExp(escapeRegExp(group.emoji), "g"), "")
+    : label;
   const withoutCode = withoutEmoji
-    .replace(new RegExp(`^${escapeRegExp(code)}\\s*-?\\s*`, "i"), "")
+    .replace(new RegExp(`^${escapeRegExp(group.code)}\\s*-?\\s*`, "i"), "")
     .trim();
-  const compact = withoutCode || label.replace(/\p{Extended_Pictographic}/gu, "").trim();
+  const compact = withoutCode || group.name;
 
   return toTitleCase(compact);
 }
