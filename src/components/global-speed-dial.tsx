@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Plus, X, Camera, Mic } from "lucide-react";
 import { useAssistantStore } from "@/lib/assistant-store";
 
@@ -16,12 +16,29 @@ export function GlobalSpeedDial({
   const [isOpen, setIsOpen] = useState(false);
   const launch = useAssistantStore((s) => s.launch);
   const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
-  const visualProgress = isHidden ? 1 : clampedProgress;
-  const isInteractionHidden = isHidden || visualProgress >= 0.98;
+  const isExplicitlyHidden = isHidden;
+  const isExpanded = isOpen && !isExplicitlyHidden;
+  const effectiveHiddenProgress = isExplicitlyHidden ? 1 : isExpanded ? 0 : clampedProgress;
+  const isScrollHidden = !isExpanded && effectiveHiddenProgress >= 0.98;
+  const isRootHidden = isExplicitlyHidden || isScrollHidden;
+  const isActivatorInteractive =
+    !isExplicitlyHidden && (isExpanded || effectiveHiddenProgress < 0.98);
+
+  useEffect(() => {
+    if (isExplicitlyHidden) {
+      // Explicit hide should immediately collapse the menu state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsOpen(false);
+    }
+  }, [isExplicitlyHidden]);
 
   const toggle = useCallback(() => {
+    if (isExplicitlyHidden || isScrollHidden) {
+      return;
+    }
+
     setIsOpen((prev) => !prev);
-  }, []);
+  }, [isExplicitlyHidden, isScrollHidden]);
 
   const dismiss = useCallback(() => {
     setIsOpen(false);
@@ -40,27 +57,31 @@ export function GlobalSpeedDial({
   return (
     <>
       <div
-        className={`speed-dial-overlay${isOpen && !isInteractionHidden ? " is-open" : ""}`}
+        className={`speed-dial-overlay${isExpanded ? " is-open" : ""}`}
         onClick={dismiss}
         aria-hidden
       />
 
       <div
-        className={`speed-dial-container${isInteractionHidden ? " is-hidden" : ""}`}
+        className={`speed-dial-container${isRootHidden ? " is-hidden" : ""}`}
         style={{
-          transform: `translate3d(0, ${visualProgress * 16}px, 0) scale(${1 - visualProgress * 0.04})`,
-          opacity: 1 - visualProgress,
-          pointerEvents: isInteractionHidden ? "none" : undefined,
+          transform: `translate3d(0, ${effectiveHiddenProgress * 16}px, 0) scale(${1 - effectiveHiddenProgress * 0.04})`,
+          opacity: 1 - effectiveHiddenProgress,
+          pointerEvents: isRootHidden ? "none" : "auto",
           transition: isScrollControlled ? "none" : undefined,
           willChange: "transform, opacity",
         }}
       >
-        <div className="speed-dial-actions">
+        <div
+          className={`speed-dial-actions${isExpanded ? " is-open" : ""}`}
+          aria-hidden={isExpanded ? undefined : true}
+        >
           <button
             type="button"
-            className={`speed-dial-action${isOpen ? " open-1" : " closed"}`}
+            className={`speed-dial-action${isExpanded ? " is-open open-1" : " closed"}`}
             onClick={handleVoice}
             aria-label="Voice assistant"
+            tabIndex={isExpanded ? undefined : -1}
           >
             <Mic className="size-5" />
             <span className="speed-dial-label">Voice</span>
@@ -68,9 +89,10 @@ export function GlobalSpeedDial({
 
           <button
             type="button"
-            className={`speed-dial-action${isOpen ? " open-0" : " closed"}`}
+            className={`speed-dial-action${isExpanded ? " is-open open-0" : " closed"}`}
             onClick={handleCamera}
             aria-label="Add stickers via camera"
+            tabIndex={isExpanded ? undefined : -1}
           >
             <Camera className="size-5" />
             <span className="speed-dial-label">Camera</span>
@@ -79,12 +101,13 @@ export function GlobalSpeedDial({
 
         <button
           type="button"
-          className="speed-dial-fab"
+          className={`speed-dial-fab${isActivatorInteractive ? " is-interactive" : ""}`}
           onClick={toggle}
-          aria-label={isOpen ? "Close actions" : "Open actions"}
+          aria-label={isExpanded ? "Close actions" : "Open actions"}
+          tabIndex={isActivatorInteractive ? undefined : -1}
         >
-          <span className={`speed-dial-fab-icon${isOpen ? " is-open" : ""}`}>
-            {isOpen ? <X className="size-6" /> : <Plus className="size-6" />}
+          <span className={`speed-dial-fab-icon${isExpanded ? " is-open" : ""}`}>
+            {isExpanded ? <X className="size-6" /> : <Plus className="size-6" />}
           </span>
         </button>
       </div>

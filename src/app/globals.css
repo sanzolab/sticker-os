@@ -212,6 +212,7 @@ input {
   right: 1rem;
   bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
   z-index: 40;
+  pointer-events: none;
   transition: opacity 200ms ease, transform 200ms ease;
 }
 
@@ -229,6 +230,24 @@ input {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.75rem;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms ease-out,
+    visibility 0ms linear 160ms;
+}
+
+.speed-dial-actions.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms ease-out,
+    visibility 0ms linear 0ms;
 }
 
 /* Pseudo-element idle pulse ring on the main FAB button */
@@ -249,6 +268,11 @@ input {
   transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform;
   -webkit-tap-highlight-color: transparent;
+  pointer-events: none;
+}
+
+.speed-dial-fab.is-interactive {
+  pointer-events: auto;
 }
 
 .speed-dial-fab:active {
@@ -307,6 +331,15 @@ input {
     opacity 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform, opacity;
   -webkit-tap-highlight-color: transparent;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.5rem) scale(0);
+  pointer-events: none;
+}
+
+.speed-dial-action.is-open {
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .speed-dial-action:active {
@@ -318,20 +351,24 @@ input {
   opacity: 0;
   transform: translateY(0.5rem) scale(0);
   pointer-events: none;
+  visibility: hidden;
   transition:
     transform 150ms ease-in,
-    opacity 100ms ease-in;
+    opacity 100ms ease-in,
+    visibility 0ms linear 150ms;
 }
 
 /* Open state - staggered from bottom-to-top */
 .speed-dial-action.open-0 {
   opacity: 1;
+  visibility: visible;
   transform: translateY(0) scale(1);
   transition-delay: 0ms;
 }
 
 .speed-dial-action.open-1 {
   opacity: 1;
+  visibility: visible;
   transform: translateY(0) scale(1);
   transition-delay: 60ms;
 }
@@ -794,6 +831,10 @@ input {
    ────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
+  .speed-dial-actions {
+    transition: none;
+  }
+
   .speed-dial-action.closed,
   .speed-dial-action.open-0,
   .speed-dial-action.open-1 {
