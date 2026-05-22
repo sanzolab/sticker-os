@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { getStickerGroupLabelById, type Sticker } from "@/lib/sticker-data";
+import {
+  STICKER_QUANTITY_SAVE_UNDO_TOAST_ID,
+  withStickerQuantityUndoToast,
+} from "@/lib/sticker-quantity-toast";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
@@ -75,7 +79,7 @@ export function DuplicateEditorContent({
           const previousCopies = copies;
           const nextCopies = duplicateDraft + 1;
           setStickerCopies(sticker.id, nextCopies);
-          toast.success(t(locale, "toast.sticker.changesSaved"), {
+          toast.success(t(locale, "toast.sticker.changesSaved"), withStickerQuantityUndoToast({
             action:
               previousCopies !== nextCopies
                 ? {
@@ -85,7 +89,7 @@ export function DuplicateEditorContent({
                     },
                   }
                 : undefined,
-          });
+          }, STICKER_QUANTITY_SAVE_UNDO_TOAST_ID));
           onOpenChange(false);
         }}
       >

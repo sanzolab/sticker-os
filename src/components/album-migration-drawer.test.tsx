@@ -179,6 +179,7 @@ describe("AlbumMigrationDrawer", () => {
     expect(toastSuccessMock).toHaveBeenCalledWith(
       "Album migrated successfully.",
     );
+    expect(toastSuccessMock.mock.calls[0]?.[1]).toBeUndefined();
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

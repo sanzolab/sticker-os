@@ -10,6 +10,7 @@ export function Toaster(props: ToasterProps) {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       position="bottom-center"
+      swipeDirections={["top", "right", "bottom", "left"]}
       closeButton
       richColors
       toastOptions={{

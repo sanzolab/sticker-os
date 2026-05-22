@@ -7,6 +7,11 @@ import { haptic } from "@/lib/haptic";
 import { t, type Locale } from "@/lib/i18n";
 import { getVisualStateFromCopies } from "@/lib/getVisualStateFromCopies";
 import { getCompactStickerCode, Sticker } from "@/lib/sticker-data";
+import {
+  STICKER_QUANTITY_ADD_UNDO_TOAST_ID,
+  STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID,
+  withStickerQuantityUndoToast,
+} from "@/lib/sticker-quantity-toast";
 import { useStickerStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -229,14 +234,14 @@ export const StickerCell = memo(function StickerCell({
             compactCode,
             "success",
           ),
-          {
+          withStickerQuantityUndoToast({
             action: {
               label: t(locale, "toast.action.undo"),
               onClick: () => {
                 setStickerCopies(sticker.id, previousCopies);
               },
             },
-          },
+          }, STICKER_QUANTITY_ADD_UNDO_TOAST_ID),
         );
       }}
       onLongPress={() => {
@@ -253,7 +258,7 @@ export const StickerCell = memo(function StickerCell({
               compactCode,
               "remove",
             ),
-            {
+            withStickerQuantityUndoToast({
               className:
                 "border-red-500/25 bg-red-50 text-red-950 dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-100",
               classNames: {
@@ -266,7 +271,7 @@ export const StickerCell = memo(function StickerCell({
                   setStickerCopies(sticker.id, previousCopies);
                 },
               },
-            },
+            }, STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID),
           );
         }
         if (copies > 1) onEditDuplicates(sticker);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getCompactStickerCode,
   getCompactStickerLabel,
+  getLocalizedCountryDisplayName,
   getStickerExportLabel,
   getStickerSearchValues,
   normalizeStickerSearchText,
@@ -93,5 +94,12 @@ describe("sticker locale metadata", () => {
     expect(getCompactStickerCode(mexico)).toBe("MEX 11");
     expect(getCompactStickerCode(usa)).toBe("USA 18");
     expect(getCompactStickerCode(cocaCola)).toBe("CC 14");
+  });
+
+  it("localizes country display names for the visual UI", () => {
+    expect(getLocalizedCountryDisplayName("MEX", "es")).toBe("México");
+    expect(getLocalizedCountryDisplayName("USA", "es")).toBe("Estados Unidos");
+    expect(getLocalizedCountryDisplayName("ESP", "es")).toBe("España");
+    expect(getLocalizedCountryDisplayName("USA", "en")).toBe("United States");
   });
 });

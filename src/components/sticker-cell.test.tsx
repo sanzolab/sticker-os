@@ -5,6 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StickerCell, StickerTile } from "./sticker-cell";
 import { getCompactStickerCode, stickers } from "@/lib/sticker-data";
+import {
+  STICKER_QUANTITY_ADD_UNDO_TOAST_ID,
+  STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID,
+} from "@/lib/sticker-quantity-toast";
 import { useStickerStore } from "@/lib/store";
 
 const { toastMock, toastSuccessMock } = vi.hoisted(() => ({
@@ -281,6 +285,8 @@ describe("StickerCell", () => {
     unmount();
 
     const action = toastCall?.[1]?.action;
+    expect(toastCall?.[1]?.id).toBe(STICKER_QUANTITY_ADD_UNDO_TOAST_ID);
+    expect(toastCall?.[1]?.position).toBe("bottom-center");
     expect(action?.label).toBe("Undo");
     action?.onClick?.();
 
@@ -331,11 +337,80 @@ describe("StickerCell", () => {
     const options = toastCall?.[1];
     expect(options?.className).toContain("border-red-500/25");
     expect(options?.classNames?.actionButton).toContain("bg-red-700");
+    expect(options?.id).toBe(STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID);
+    expect(options?.position).toBe("bottom-center");
 
     const action = options?.action;
     expect(action?.label).toBe("Undo");
     action?.onClick?.();
 
     expect(useStickerStore.getState().collectionByStickerId[sticker.id]).toBe(1);
+  });
+
+  it("reuses the same toast id for rapid quantity changes", async () => {
+    const user = userEvent.setup();
+    useStickerStore.setState((state) => ({
+      ...state,
+      collectionByStickerId: { [sticker.id]: 0 },
+      settings: {
+        ...state.settings,
+        haptics: false,
+        locale: "en",
+        localeSource: "manual",
+      },
+    }));
+
+    render(
+      <StickerCell
+        sticker={sticker}
+        onEditDuplicates={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button"));
+    await user.click(screen.getByRole("button"));
+
+    expect(toastSuccessMock).toHaveBeenCalledTimes(2);
+    const firstOptions = toastSuccessMock.mock.calls[0]?.[1];
+    const secondOptions = toastSuccessMock.mock.calls[1]?.[1];
+    expect(firstOptions?.id).toBe(STICKER_QUANTITY_ADD_UNDO_TOAST_ID);
+    expect(secondOptions?.id).toBe(STICKER_QUANTITY_ADD_UNDO_TOAST_ID);
+  });
+
+  it("reuses remove toast id for rapid remove actions and keeps red styles", () => {
+    vi.useFakeTimers();
+    useStickerStore.setState((state) => ({
+      ...state,
+      collectionByStickerId: { [sticker.id]: 1 },
+      settings: {
+        ...state.settings,
+        haptics: false,
+        locale: "en",
+        localeSource: "manual",
+      },
+    }));
+
+    render(
+      <StickerCell
+        sticker={sticker}
+        onEditDuplicates={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button");
+    fireEvent.pointerDown(button);
+    vi.advanceTimersByTime(500);
+
+    useStickerStore.getState().setStickerCopies(sticker.id, 1);
+    fireEvent.pointerDown(button);
+    vi.advanceTimersByTime(500);
+
+    expect(toastMock).toHaveBeenCalledTimes(2);
+    const firstOptions = toastMock.mock.calls[0]?.[1];
+    const secondOptions = toastMock.mock.calls[1]?.[1];
+    expect(firstOptions?.id).toBe(STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID);
+    expect(secondOptions?.id).toBe(STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID);
+    expect(secondOptions?.className).toContain("border-red-500/25");
+    expect(secondOptions?.classNames?.actionButton).toContain("bg-red-700");
   });
 });

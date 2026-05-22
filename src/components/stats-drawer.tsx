@@ -17,7 +17,12 @@ import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { TabSlider } from "@/components/ui/tab-slider";
 import { t } from "@/lib/i18n";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
-import { getStickerCopies, stickerGroups, stickers } from "@/lib/sticker-data";
+import {
+  getLocalizedCountryDisplayName,
+  getStickerCopies,
+  stickerGroups,
+  stickers,
+} from "@/lib/sticker-data";
 import { ProgressRing } from "./progress-ring";
 import { ProgressRow } from "./progress-row";
 import { TeamProgressRow } from "./team-progress-row";
@@ -70,10 +75,10 @@ export function StatsDrawer({
     () =>
       !open || activeTab !== "teams"
         ? []
-        : buildTeamProgress(collectionByStickerId).sort((a, b) =>
+        : buildTeamProgress(collectionByStickerId, locale).sort((a, b) =>
             teamSort === "most" ? b.percent - a.percent : a.percent - b.percent,
           ),
-    [activeTab, collectionByStickerId, open, teamSort],
+    [activeTab, collectionByStickerId, locale, open, teamSort],
   );
 
   return (
@@ -283,7 +288,10 @@ function DrawerMetricCell({
   );
 }
 
-function buildTeamProgress(collectionByStickerId: Record<string, number>) {
+function buildTeamProgress(
+  collectionByStickerId: Record<string, number>,
+  locale: "en" | "es",
+) {
   return stickerGroups
     .filter((group) => group.category === "country")
     .map((group) => {
@@ -299,7 +307,10 @@ function buildTeamProgress(collectionByStickerId: Record<string, number>) {
         code: group.countryCode ?? group.id.toUpperCase(),
         flag: group.flag ?? "",
         label: group.label,
-        name: group.name,
+        name: getLocalizedCountryDisplayName(
+          group.countryCode ?? group.id.toUpperCase(),
+          locale,
+        ),
         collected,
         total,
         percent: percentage(collected, total),

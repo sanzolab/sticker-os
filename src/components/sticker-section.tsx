@@ -7,6 +7,8 @@ import { useSectionLifecycle } from "@/components/use-section-lifecycle";
 import { getSectionLifecycleRegistry } from "@/lib/section-lifecycle";
 import { t } from "@/lib/i18n";
 import {
+  getLocalizedCountryDisplayName,
+  getStickerGroupLabel,
   type Sticker,
   type StickerGroup,
 } from "@/lib/sticker-data";
@@ -59,6 +61,13 @@ export const StickerSection = memo(function StickerSection({
 
   const isPlaceholder = phase === "placeholder";
   const isVisible = phase === "visible";
+  const groupHeading =
+    group.category === "country"
+      ? getLocalizedCountryDisplayName(
+          group.countryCode ?? group.id.toUpperCase(),
+          locale,
+        )
+      : getStickerGroupLabel(group, locale);
 
   return (
     <section
@@ -89,7 +98,13 @@ export const StickerSection = memo(function StickerSection({
           >
             <header>
               <h2 className="text-lg font-semibold tracking-normal">
-                {group.emoji ?? group.flag ?? ""} {group.code} - {group.name}
+                {group.category === "country" ? (
+                  <>
+                    {group.emoji ?? group.flag ?? ""} {group.code} - {groupHeading}
+                  </>
+                ) : (
+                  groupHeading
+                )}
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {duplicates > 0

@@ -744,6 +744,13 @@ export function getStickerGroupLabelById(groupId: string, locale: Locale) {
   return group ? getStickerGroupLabel(group, locale) : groupId;
 }
 
+export function getLocalizedCountryDisplayName(
+  code: string,
+  locale: Locale,
+) {
+  return getCountryDisplayName(code, locale) ?? code;
+}
+
 export function getCompactStickerLabel(
   sticker: Sticker,
   locale: Locale,
@@ -771,7 +778,7 @@ export function getCompactStickerLabel(
   return {
     primary: code,
     secondary: sticker.number,
-    detail: getCountryDisplayName(code, locale) ?? (() => {
+    detail: getLocalizedCountryDisplayName(code, locale) ?? (() => {
       const group = stickerGroupsById[sticker.groupId];
       return group ? getCompactGroupDetail(group, locale) : code;
     })(),
