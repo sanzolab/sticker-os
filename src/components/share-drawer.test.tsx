@@ -57,6 +57,7 @@ beforeEach(() => {
     settings: {
       ...state.settings,
       locale: "en",
+      localeSource: "manual",
     },
   }));
 });

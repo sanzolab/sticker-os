@@ -72,6 +72,7 @@ beforeEach(() => {
     settings: {
       ...state.settings,
       locale: "en",
+      localeSource: "manual",
     },
     collectionByStickerId: {
       [first.id]: 1,

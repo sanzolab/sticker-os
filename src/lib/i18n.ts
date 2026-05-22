@@ -1,6 +1,7 @@
-export const supportedLocales = ["en", "es"] as const;
+import { supportedLocales, type Locale } from "@/lib/locale-meta";
 
-export type Locale = (typeof supportedLocales)[number];
+export { supportedLocales };
+export type { Locale };
 
 const translations = {
   en: {

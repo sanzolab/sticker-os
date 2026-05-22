@@ -3,8 +3,14 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import type { Locale } from "@/lib/locale-meta";
+import { defaultLocale } from "@/lib/locale-meta";
+import {
+  normalizeLocale,
+  normalizeLocaleSource,
+  type LocaleSource,
+} from "@/lib/locale";
 import { starterCollection, stickerGroups, stickers } from "@/lib/sticker-data";
-import type { Locale } from "@/lib/i18n";
 import {
   applyTradeToCollection,
   canApplyTrade,
@@ -18,16 +24,31 @@ export type Settings = {
   haptics: boolean;
   theme: ThemePreference;
   locale: Locale;
+  localeSource: LocaleSource;
 };
 
 const STORAGE_KEY = "stickeros-collection-v1";
 
-const defaultSettings: Settings = {
-  animations: true,
-  haptics: true,
-  theme: "system",
-  locale: "en",
+const FALLBACK_LOCALE_SOURCE: LocaleSource = "auto";
+
+let initialLocalePreference: { locale: Locale; source: LocaleSource } = {
+  locale: defaultLocale,
+  source: FALLBACK_LOCALE_SOURCE,
 };
+
+function createDefaultSettings(): Settings {
+  return {
+    animations: true,
+    haptics: true,
+    theme: "system",
+    locale: initialLocalePreference.locale,
+    localeSource: initialLocalePreference.source,
+  };
+}
+
+export function setInitialLocalePreference(locale: Locale, source: LocaleSource) {
+  initialLocalePreference = { locale, source };
+}
 
 type CollectionStats = {
   total: number;
@@ -61,6 +82,7 @@ type StickerOSState = {
   applyTrade: (receiveIds: string[], giveIds: string[]) => ApplyTradeResult;
   resetCollection: () => void;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
+  setLocalePreference: (locale: Locale, source: LocaleSource) => void;
 };
 
 export const useStickerStore = create<StickerOSState>()(
@@ -72,7 +94,7 @@ export const useStickerStore = create<StickerOSState>()(
       version: 1,
       selectedCollection: "SrickerOS",
       collectionByStickerId: starterCollection,
-      settings: defaultSettings,
+      settings: createDefaultSettings(),
       searchQuery: "",
 
       setSearchQuery: (searchQuery) => set({ searchQuery }),
@@ -140,6 +162,11 @@ export const useStickerStore = create<StickerOSState>()(
         set((state) => ({
           settings: { ...state.settings, [key]: value },
         })),
+
+      setLocalePreference: (locale, source) =>
+        set((state) => ({
+          settings: { ...state.settings, locale, localeSource: source },
+        })),
     }),
     {
       name: STORAGE_KEY,
@@ -155,11 +182,10 @@ export const useStickerStore = create<StickerOSState>()(
             persisted?.collectionByStickerId,
             currentState.collectionByStickerId,
           ),
-          settings: {
-            ...defaultSettings,
-            ...persisted?.settings,
-            locale: persisted?.settings?.locale ?? defaultSettings.locale,
-          },
+          settings: resolveMergedSettings(
+            persisted?.settings,
+            currentState.settings,
+          ),
         };
       },
 
@@ -202,6 +228,42 @@ function sanitizeCollection(
   }
 
   return sanitized;
+}
+
+export function resolveMergedSettings(
+  persistedSettings: Partial<Settings> | undefined,
+  currentSettings: Settings,
+): Settings {
+  const nextSettings: Settings = {
+    ...currentSettings,
+    animations:
+      typeof persistedSettings?.animations === "boolean"
+        ? persistedSettings.animations
+        : currentSettings.animations,
+    haptics:
+      typeof persistedSettings?.haptics === "boolean"
+        ? persistedSettings.haptics
+        : currentSettings.haptics,
+    theme: isThemePreference(persistedSettings?.theme)
+      ? persistedSettings.theme
+      : currentSettings.theme,
+  };
+
+  const persistedLocale = normalizeLocale(persistedSettings?.locale);
+  if (!persistedLocale) {
+    return nextSettings;
+  }
+
+  return {
+    ...nextSettings,
+    locale: persistedLocale,
+    localeSource: normalizeLocaleSource(persistedSettings?.localeSource)
+      ?? "persisted",
+  };
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "system" || value === "light" || value === "dark";
 }
 
 // ✅ Stats estables (SIN loops)

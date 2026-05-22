@@ -38,6 +38,7 @@ export function SettingsDrawer({
   const [exportKind, setExportKind] = useState<ExportKind>("both");
   const settings = useStickerStore((state) => state.settings);
   const updateSetting = useStickerStore((state) => state.updateSetting);
+  const setLocalePreference = useStickerStore((state) => state.setLocalePreference);
   const resetCollection = useStickerStore((state) => state.resetCollection);
   const setCollectionByStickerId = useStickerStore(
     (state) => state.setCollectionByStickerId,
@@ -112,7 +113,7 @@ export function SettingsDrawer({
               label: t(locale, option.labelKey),
             }))}
             value={settings.locale}
-            onChange={(value) => updateSetting("locale", value)}
+            onChange={(value) => setLocalePreference(value, "manual")}
             columns={2}
             buttonClassName="h-10 rounded-sm border text-sm font-medium transition-colors"
           />

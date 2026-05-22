@@ -33,6 +33,7 @@ describe("StickerTile", () => {
       settings: {
         ...state.settings,
         haptics: false,
+        localeSource: "manual",
       },
     }));
   });
@@ -237,6 +238,7 @@ describe("StickerCell", () => {
       settings: {
         ...state.settings,
         haptics: false,
+        localeSource: "manual",
       },
     }));
   });
@@ -250,6 +252,7 @@ describe("StickerCell", () => {
         ...state.settings,
         haptics: false,
         locale: "en",
+        localeSource: "manual",
       },
     }));
 
@@ -293,6 +296,7 @@ describe("StickerCell", () => {
         ...state.settings,
         haptics: false,
         locale: "en",
+        localeSource: "manual",
       },
     }));
 

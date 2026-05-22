@@ -40,6 +40,7 @@ describe("AlbumTabPanel read-only mode", () => {
       collectionByStickerId: {},
       settings: {
         locale: "en",
+        localeSource: "manual",
         animations: true,
         haptics: true,
         theme: "system",
