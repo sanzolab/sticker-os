@@ -1,8 +1,9 @@
 "use client";
 
-import { Copy, Download, RotateCcw } from "lucide-react";
+import { Copy, Download, RefreshCw, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { Button } from "@/components/ui/button";
@@ -12,17 +13,24 @@ import { localeOptions, t } from "@/lib/i18n";
 import { extractCacheNameFromServiceWorker, extractCacheVersion } from "@/lib/service-worker";
 import { useStickerStore, type ThemePreference } from "@/lib/store";
 import { stickerExportOptions, buildTxtExportByKind, getExportMeta, type ExportKind } from "@/lib/export";
+import {
+  cloneCollection,
+  hasCollectionChangedSinceExpected,
+  type CollectionSnapshotUndo,
+} from "@/lib/collection-snapshot-undo";
 import { copyText, downloadText } from "./export-actions";
 import { SettingRow } from "./setting-row";
 
 export function SettingsDrawer({
   open,
   onOpenChange,
+  onOpenMigration,
   collectionName,
   collectionByStickerId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenMigration: () => void;
   collectionName: string;
   collectionByStickerId: Record<string, number>;
 }) {
@@ -30,9 +38,17 @@ export function SettingsDrawer({
   const [exportKind, setExportKind] = useState<ExportKind>("both");
   const settings = useStickerStore((state) => state.settings);
   const updateSetting = useStickerStore((state) => state.updateSetting);
+  const setLocalePreference = useStickerStore((state) => state.setLocalePreference);
   const resetCollection = useStickerStore((state) => state.resetCollection);
+  const setCollectionByStickerId = useStickerStore(
+    (state) => state.setCollectionByStickerId,
+  );
   const locale = useStickerStore((state) => state.settings.locale);
   const [cacheVersion, setCacheVersion] = useState<string | null>(null);
+  const [pendingResetUndo, setPendingResetUndo] = useState<CollectionSnapshotUndo | null>(
+    null,
+  );
+  const [resetUndoDialogOpen, setResetUndoDialogOpen] = useState(false);
 
   const getExportText = () =>
     buildTxtExportByKind(
@@ -97,7 +113,7 @@ export function SettingsDrawer({
               label: t(locale, option.labelKey),
             }))}
             value={settings.locale}
-            onChange={(value) => updateSetting("locale", value)}
+            onChange={(value) => setLocalePreference(value, "manual")}
             columns={2}
             buttonClassName="h-10 rounded-sm border text-sm font-medium transition-colors"
           />
@@ -164,7 +180,11 @@ export function SettingsDrawer({
               onClick={async () => {
                 const exportText = getExportText();
                 const copied = await copyText(exportText);
-                if (!copied) downloadText(exportMeta.fileName, exportText);
+                if (copied) {
+                  toast.success(t(locale, "toast.common.copiedSuccess"));
+                  return;
+                }
+                toast.error(t(locale, "toast.common.copyFailed"));
               }}
             >
               <Copy className="size-4" />
@@ -173,12 +193,43 @@ export function SettingsDrawer({
             <Button
               size="pill"
               className="shadow-none"
-              onClick={() => downloadText(exportMeta.fileName, getExportText())}
+              onClick={() => {
+                const downloaded = downloadText(exportMeta.fileName, getExportText());
+                if (downloaded) {
+                  toast.success(t(locale, "toast.common.txtDownloaded"), {
+                    description: t(locale, "toast.common.txtDownloadedDescription"),
+                  });
+                  return;
+                }
+                toast.error(t(locale, "toast.common.downloadFailed"));
+              }}
             >
               <Download className="size-4" />
               {t(locale, "settings.export.download")}
             </Button>
           </div>
+        </div>
+        <div className="space-y-3 border-t pt-4">
+          <div>
+            <p className="text-sm font-medium">
+              {t(locale, "settings.migration.title")}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t(locale, "settings.migration.description")}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="pill"
+            className="w-full shadow-none"
+            onClick={() => {
+              onOpenChange(false);
+              onOpenMigration();
+            }}
+          >
+            <RefreshCw className="size-4" />
+            {t(locale, "settings.migration.button")}
+          </Button>
         </div>
         <div className="space-y-3 border-t pt-4">
           <div>
@@ -219,7 +270,41 @@ export function SettingsDrawer({
                   <Button
                     variant="destructive"
                     className="shadow-none"
-                    onClick={resetCollection}
+                    onClick={() => {
+                      const beforeCollection = cloneCollection(collectionByStickerId);
+                      resetCollection();
+                      const expectedCurrentCollection = cloneCollection(
+                        useStickerStore.getState().collectionByStickerId,
+                      );
+
+                      setPendingResetUndo({
+                        beforeCollection,
+                        expectedCurrentCollection,
+                      });
+
+                      toast.success(t(locale, "toast.reset.completed"), {
+                        action: {
+                          label: t(locale, "toast.action.undo"),
+                          onClick: () => {
+                            const currentCollection =
+                              useStickerStore.getState().collectionByStickerId;
+                            const hasNewerChanges = hasCollectionChangedSinceExpected({
+                              currentCollection,
+                              expectedCurrentCollection,
+                            });
+
+                            if (hasNewerChanges) {
+                              setResetUndoDialogOpen(true);
+                              return;
+                            }
+
+                            setCollectionByStickerId(beforeCollection);
+                            setPendingResetUndo(null);
+                            toast.success(t(locale, "toast.reset.reverted"));
+                          },
+                        },
+                      });
+                    }}
                   >
                     {t(locale, "settings.reset.dialogConfirm")}
                   </Button>
@@ -229,6 +314,54 @@ export function SettingsDrawer({
           </AlertDialog>
         </div>
       </div>
+      <AlertDialog
+        open={resetUndoDialogOpen}
+        onOpenChange={setResetUndoDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t(locale, "toast.reset.undoTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingResetUndo &&
+              hasCollectionChangedSinceExpected({
+                currentCollection: collectionByStickerId,
+                expectedCurrentCollection: pendingResetUndo.expectedCurrentCollection,
+              })
+                ? t(locale, "toast.reset.undoOverwriteDescription")
+                : t(locale, "toast.reset.undoDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="secondary" className="shadow-none">
+                {t(locale, "common.cancel")}
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                className="shadow-none"
+                onClick={() => {
+                  if (!pendingResetUndo) {
+                    setResetUndoDialogOpen(false);
+                    return;
+                  }
+
+                  try {
+                    setCollectionByStickerId(pendingResetUndo.beforeCollection);
+                    setPendingResetUndo(null);
+                    toast.success(t(locale, "toast.reset.reverted"));
+                  } catch {
+                    toast.error(t(locale, "toast.reset.revertFailed"));
+                  }
+                }}
+              >
+                {t(locale, "toast.reset.undoConfirm")}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppDrawer>
   );
 }

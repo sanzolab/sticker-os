@@ -542,6 +542,7 @@ function buildGroupAliases() {
     aliases.set(normalizeStickerText(group.id), code);
     aliases.set(normalizeStickerText(group.label), code);
     aliases.set(normalizeStickerText(group.exportLabel), code);
+    aliases.set(normalizeStickerText(group.name), code);
     if (group.countryCode) aliases.set(normalizeStickerText(group.countryCode), code);
   }
 
@@ -726,6 +727,7 @@ function buildVoiceBlockAliasCodeMap() {
     addAlias(group.id, code);
     addAlias(group.label, code);
     addAlias(group.exportLabel, code);
+    addAlias(group.name, code);
   }
 
   for (const [alias, code] of groupAliases.entries()) {

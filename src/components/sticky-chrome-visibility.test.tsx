@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { render } from "@testing-library/react";
+import { render, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GlobalSpeedDial } from "./global-speed-dial";
 import { StickyControls } from "./sticky-controls";
@@ -46,7 +46,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={1}
         isStickyActive={false}
@@ -69,7 +68,6 @@ describe("sticky chrome visibility styles", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0}
         isStickyActive
@@ -91,11 +89,109 @@ describe("sticky chrome visibility styles", () => {
     expect(header?.style.willChange).toBe("transform");
   });
 
+  it("does not show a trade badge when there is no pending exchange", () => {
+    const { container } = render(
+      <TopBar
+        collectionName="StickerOS"
+        pendingAddStickersCount={0}
+        tradeBadgeValue={null}
+        hiddenProgress={0}
+        isStickyActive={false}
+        onShare={vi.fn()}
+        onAddStickers={vi.fn()}
+        onTrade={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    const tradeButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="topbar.tradeAria"]',
+    );
+    expect(tradeButton?.querySelector(".bg-primary")).toBeNull();
+  });
+
+  it("shows an exclamation badge when trade is pending without selections", () => {
+    const { container } = render(
+      <TopBar
+        collectionName="StickerOS"
+        pendingAddStickersCount={0}
+        tradeBadgeValue="!"
+        hiddenProgress={0}
+        isStickyActive={false}
+        onShare={vi.fn()}
+        onAddStickers={vi.fn()}
+        onTrade={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    const tradeButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="topbar.tradeAria"]',
+    );
+    expect(tradeButton).not.toBeNull();
+    if (!tradeButton) return;
+
+    expect(within(tradeButton).getByText("!")).toBeTruthy();
+    expect(
+      within(tradeButton).getByLabelText("topbar.tradeBadge.pendingNeedsSelection"),
+    ).toBeTruthy();
+  });
+
+  it("shows the selected-card total in the trade badge", () => {
+    const { container } = render(
+      <TopBar
+        collectionName="StickerOS"
+        pendingAddStickersCount={0}
+        tradeBadgeValue="7"
+        hiddenProgress={0}
+        isStickyActive={false}
+        onShare={vi.fn()}
+        onAddStickers={vi.fn()}
+        onTrade={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    const tradeButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="topbar.tradeAria"]',
+    );
+    expect(tradeButton).not.toBeNull();
+    if (!tradeButton) return;
+
+    expect(within(tradeButton).getByText("7")).toBeTruthy();
+    expect(
+      within(tradeButton).getByLabelText("topbar.tradeBadge.pendingCount"),
+    ).toBeTruthy();
+  });
+
+  it("caps large trade badge values at 99+", () => {
+    const { container } = render(
+      <TopBar
+        collectionName="StickerOS"
+        pendingAddStickersCount={0}
+        tradeBadgeValue="120"
+        hiddenProgress={0}
+        isStickyActive={false}
+        onShare={vi.fn()}
+        onAddStickers={vi.fn()}
+        onTrade={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    const tradeButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="topbar.tradeAria"]',
+    );
+    expect(tradeButton).not.toBeNull();
+    if (!tradeButton) return;
+
+    expect(within(tradeButton).getByText("99+")).toBeTruthy();
+  });
+
   it("snaps top bar hidden once the hide threshold is crossed", () => {
     const { container } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.6}
         isStickyActive
@@ -120,7 +216,6 @@ describe("sticky chrome visibility styles", () => {
     const { container, rerender } = render(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.6}
         isStickyActive
@@ -138,7 +233,6 @@ describe("sticky chrome visibility styles", () => {
     rerender(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.5}
         isStickyActive
@@ -154,7 +248,6 @@ describe("sticky chrome visibility styles", () => {
     rerender(
       <TopBar
         collectionName="StickerOS"
-        shareState="idle"
         pendingAddStickersCount={0}
         hiddenProgress={0.4}
         isStickyActive

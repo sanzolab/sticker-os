@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { CollectionHeader } from "@/components/collection-header";
 import { DuplicateEditor } from "@/components/duplicate-editor";
 import { AlbumTabPanel } from "@/components/album-tab-panel";
@@ -8,15 +9,19 @@ import { AddStickersDrawer } from "@/components/features/add-stickers/add-sticke
 import { ShareDrawer } from "@/components/share-drawer";
 import { SettingsDrawer } from "@/components/settings-drawer";
 import { StatsDrawer } from "@/components/stats-drawer";
+import { AlbumMigrationDrawer } from "@/components/album-migration-drawer";
 import { StickyControls, albumTabs, type AlbumTab } from "@/components/sticky-controls";
-import { TopBar, type ShareState } from "@/components/top-bar";
+import { TopBar } from "@/components/top-bar";
 import { TradeDrawer } from "@/components/trade-drawer";
 import { resolveTabScrollTarget } from "@/components/tab-scroll-restoration";
 import { useIsomorphicLayoutEffect } from "@/components/use-isomorphic-layout-effect";
 import { useElementHeight } from "@/hooks/use-element-height";
 import { useAssistantStore } from "@/lib/assistant-store";
+import { t } from "@/lib/i18n";
 import { usePageScrollVisibility, useRegisterStickyActivation } from "@/lib/scroll-visibility";
 import { useCollectionStats, useStickerStore } from "@/lib/store";
+import { useTradeSessionStore } from "@/lib/trade-session";
+import { getTradeBadgeValue } from "@/lib/trade-badge";
 import { useAddStickersPendingStore } from "@/components/features/add-stickers/add-stickers-session";
 import type { Sticker } from "@/lib/sticker-data";
 
@@ -26,6 +31,7 @@ const STICKY_SAFETY_BUFFER_PX = 8;
 
 export function StickerOSApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [migrationOpen, setMigrationOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -33,7 +39,6 @@ export function StickerOSApp() {
   const [activeTab, setActiveTab] = useState<AlbumTab>("all");
   const [duplicateEditorSticker, setDuplicateEditorSticker] =
     useState<Sticker | null>(null);
-  const [shareState, setShareState] = useState<ShareState>("idle");
   const stickyActivationSentinelRef = useRef<HTMLDivElement | null>(null);
   const stickyControlsRef = useRef<HTMLElement | null>(null);
   const topBarRef = useRef<HTMLElement | null>(null);
@@ -55,8 +60,23 @@ export function StickerOSApp() {
   const pendingAddStickersCount = useAddStickersPendingStore(
     (state) => state.candidates.length,
   );
+  const tradeBadgeValue = useTradeSessionStore((state) =>
+    getTradeBadgeValue(
+      state.result,
+      state.selectedReceiveIds,
+      state.selectedGiveIds,
+    ),
+  );
   const addStickersOpen = useAssistantStore((s) => s.addStickersOpen);
   const setAddStickersOpen = useAssistantStore((s) => s.setAddStickersOpen);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const flag = sessionStorage.getItem("stickeros-import-success");
+    if (!flag) return;
+    sessionStorage.removeItem("stickeros-import-success");
+    toast.success(t(locale, "toast.import.completed"));
+  }, [locale]);
 
   const handleEditDuplicates = useCallback((sticker: Sticker) => {
     setDuplicateEditorSticker(sticker);
@@ -183,13 +203,13 @@ export function StickerOSApp() {
   }, [switchTab]);
 
   return (
-    <main className="min-h-dvh bg-background text-foreground">
+    <main className="app-wrapper text-foreground">
       <div data-scroll-chrome="shared">
         <TopBar
           rootRef={topBarRef}
           collectionName={collectionName}
-          shareState={shareState}
           pendingAddStickersCount={pendingAddStickersCount}
+          tradeBadgeValue={tradeBadgeValue}
           hiddenProgress={headerProgress}
           isStickyActive={isStickyActive}
           onShare={handleShareOpen}
@@ -252,15 +272,19 @@ export function StickerOSApp() {
       <SettingsDrawer
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+        onOpenMigration={() => setMigrationOpen(true)}
         collectionName={collectionName}
         collectionByStickerId={collectionByStickerId}
+      />
+      <AlbumMigrationDrawer
+        open={migrationOpen}
+        onOpenChange={setMigrationOpen}
       />
       <ShareDrawer
         open={shareOpen}
         onOpenChange={setShareOpen}
         collectionName={collectionName}
         collectionByStickerId={collectionByStickerId}
-        onShareStateChange={setShareState}
       />
       <AddStickersDrawer
         open={addStickersOpen}

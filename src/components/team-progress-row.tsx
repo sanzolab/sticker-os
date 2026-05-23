@@ -7,18 +7,21 @@ export function TeamProgressRow({
     code: string;
     flag: string;
     label: string;
+    name: string;
     collected: number;
     total: number;
     percent: number;
   };
 }) {
+  const flag = item.flag?.trim() ? item.flag : "🏳️";
+
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-3 text-sm">
         <span className="min-w-0 truncate">
-          <span className="mr-2">{item.flag}</span>
+          <span className="mr-2">{flag}</span>
           <span className="font-medium">{item.code}</span>
-          <span className="ml-2 text-muted-foreground">{item.label}</span>
+          <span className="ml-2 text-muted-foreground">{item.name}</span>
         </span>
         <span className="shrink-0 text-muted-foreground">
           {item.collected}/{item.total} · {item.percent}%

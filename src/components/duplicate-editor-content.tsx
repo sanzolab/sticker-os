@@ -2,11 +2,16 @@
 
 import { Minus, Plus } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { getStickerGroupLabelById, type Sticker } from "@/lib/sticker-data";
+import {
+  STICKER_QUANTITY_SAVE_UNDO_TOAST_ID,
+  withStickerQuantityUndoToast,
+} from "@/lib/sticker-quantity-toast";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
@@ -71,7 +76,20 @@ export function DuplicateEditorContent({
         size="pill"
         className="w-full"
         onClick={() => {
-          setStickerCopies(sticker.id, duplicateDraft + 1);
+          const previousCopies = copies;
+          const nextCopies = duplicateDraft + 1;
+          setStickerCopies(sticker.id, nextCopies);
+          toast.success(t(locale, "toast.sticker.changesSaved"), withStickerQuantityUndoToast({
+            action:
+              previousCopies !== nextCopies
+                ? {
+                    label: t(locale, "toast.action.undo"),
+                    onClick: () => {
+                      setStickerCopies(sticker.id, previousCopies);
+                    },
+                  }
+                : undefined,
+          }, STICKER_QUANTITY_SAVE_UNDO_TOAST_ID));
           onOpenChange(false);
         }}
       >

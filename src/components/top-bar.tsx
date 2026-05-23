@@ -10,12 +10,10 @@ import {
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
 
-export type ShareState = "idle" | "copied" | "downloaded";
-
 export function TopBar({
   collectionName,
-  shareState,
   pendingAddStickersCount,
+  tradeBadgeValue = null,
   hiddenProgress = 0,
   isStickyActive = false,
   rootRef,
@@ -25,8 +23,8 @@ export function TopBar({
   onSettings,
 }: {
   collectionName: string;
-  shareState: ShareState;
   pendingAddStickersCount: number;
+  tradeBadgeValue?: string | null;
   hiddenProgress?: number;
   isStickyActive?: boolean;
   rootRef?: RefObject<HTMLElement | null>;
@@ -43,6 +41,13 @@ export function TopBar({
     hiddenProgress: clampedProgress,
     isStickyActive,
   });
+  const tradeBadgeDisplay = formatTradeBadgeDisplay(tradeBadgeValue);
+  const tradeBadgeAriaLabel =
+    tradeBadgeValue === "!"
+      ? t(locale, "topbar.tradeBadge.pendingNeedsSelection")
+      : t(locale, "topbar.tradeBadge.pendingCount", {
+          count: tradeBadgeDisplay ?? 0,
+        });
 
   const headerStyle: CSSProperties = isStickyActive
     ? {
@@ -101,11 +106,19 @@ export function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            className="size-10 rounded-sm shadow-none"
+            className="relative size-10 rounded-sm shadow-none"
             onClick={onTrade}
             aria-label={t(locale, "topbar.tradeAria")}
           >
             <Repeat2 className="size-5" />
+            {tradeBadgeDisplay && (
+              <span
+                className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground ring-2 ring-background"
+                aria-label={tradeBadgeAriaLabel}
+              >
+                {tradeBadgeDisplay}
+              </span>
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -118,13 +131,17 @@ export function TopBar({
           </Button>
         </div>
       </div>
-      {shareState !== "idle" && (
-        <div className="absolute right-14 top-full mt-2 rounded-sm border bg-card px-2.5 py-1 text-xs text-muted-foreground">
-          {shareState === "copied"
-            ? t(locale, "topbar.shareStatus.copied")
-            : t(locale, "topbar.shareStatus.downloaded")}
-        </div>
-      )}
     </header>
   );
+}
+
+function formatTradeBadgeDisplay(value: string | null | undefined) {
+  if (!value) return null;
+  if (value === "!") return "!";
+
+  const numericValue = Number.parseInt(value, 10);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return null;
+  if (numericValue > 99) return "99+";
+
+  return String(numericValue);
 }

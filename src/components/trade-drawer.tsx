@@ -5,14 +5,25 @@ import QRCode from "react-qr-code";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, QrCode, ScanLine, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AppDrawer } from "@/components/ui/app-drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import { stickers, stickersByStickerOsIndex } from "@/lib/sticker-data";
+import { stickers } from "@/lib/sticker-data";
+import {
+  parseExchangeQrPayload,
+  type ExchangeQrMessageKey,
+} from "@/lib/exchange-qr";
 import { useStickerStore } from "@/lib/store";
+import { useTradeSessionStore } from "@/lib/trade-session";
+import {
+  cloneCollection,
+  hasCollectionChangedSinceExpected,
+  type CollectionSnapshotUndo,
+} from "@/lib/collection-snapshot-undo";
 import {
   buildTradeMatches,
   getLocalDuplicateIds,
@@ -20,9 +31,7 @@ import {
   previewTradeImpact,
 } from "@/lib/trade";
 import {
-  parseTradeQrPayload,
   sanitizeTradeDisplayName,
-  type TradeQrParseError,
 } from "@/lib/trade-qr";
 import { t } from "@/lib/i18n";
 import { TradeScanner } from "./trade-scanner";
@@ -31,12 +40,6 @@ import { TradeSection } from "./trade-section";
 import { SummaryList } from "./summary-list";
 
 type TradeStep = "entry" | "scan" | "result";
-
-type TradeResult = {
-  remoteName: string;
-  receiveIds: string[];
-  giveIds: string[];
-};
 
 export function TradeDrawer({
   open,
@@ -48,12 +51,15 @@ export function TradeDrawer({
   const [step, setStep] = useState<TradeStep>("entry");
   const [scanErrorKey, setScanErrorKey] = useState<TradeMessageKey | null>(null);
   const [applyErrorKey, setApplyErrorKey] = useState<TradeMessageKey | null>(null);
-  const [result, setResult] = useState<TradeResult | null>(null);
   const [qrValue, setQrValue] = useState("");
-  const [selectedReceiveIds, setSelectedReceiveIds] = useState<string[]>([]);
-  const [selectedGiveIds, setSelectedGiveIds] = useState<string[]>([]);
   const [showMyQr, setShowMyQr] = useState(false);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [exchangeUndoDialogOpen, setExchangeUndoDialogOpen] = useState(false);
+  const [pendingExchangeUndo, setPendingExchangeUndo] = useState<CollectionSnapshotUndo | null>(
+    null,
+  );
   const scanAbortRef = useRef<AbortController | null>(null);
+  const lastScannedCodeRef = useRef<string | null>(null);
 
   const locale = useStickerStore((state) => state.settings.locale);
   const collectionName = useStickerStore((state) => state.selectedCollection);
@@ -61,6 +67,26 @@ export function TradeDrawer({
     (state) => state.collectionByStickerId,
   );
   const applyTrade = useStickerStore((state) => state.applyTrade);
+  const setCollectionByStickerId = useStickerStore(
+    (state) => state.setCollectionByStickerId,
+  );
+  const result = useTradeSessionStore((state) => state.result);
+  const selectedReceiveIds = useTradeSessionStore(
+    (state) => state.selectedReceiveIds,
+  );
+  const selectedGiveIds = useTradeSessionStore(
+    (state) => state.selectedGiveIds,
+  );
+  const setTradeResult = useTradeSessionStore((state) => state.setResult);
+  const toggleReceiveId = useTradeSessionStore((state) => state.toggleReceiveId);
+  const toggleGiveId = useTradeSessionStore((state) => state.toggleGiveId);
+  const toggleAllReceiveIds = useTradeSessionStore(
+    (state) => state.toggleAllReceiveIds,
+  );
+  const toggleAllGiveIds = useTradeSessionStore(
+    (state) => state.toggleAllGiveIds,
+  );
+  const clearTradeSession = useTradeSessionStore((state) => state.clearSession);
 
   const displayName = sanitizeTradeDisplayName(collectionName);
   const stickerOsIndexes = useMemo(
@@ -88,18 +114,13 @@ export function TradeDrawer({
     return () => controller.abort();
   }, [stickerOsIndexes]);
 
-  const resetFlow = useCallback(() => {
-    setStep("entry");
-    setScanErrorKey(null);
-    setApplyErrorKey(null);
-    setResult(null);
-    setSelectedReceiveIds([]);
-    setSelectedGiveIds([]);
-    setShowMyQr(false);
-  }, []);
-
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) resetFlow();
+    if (!nextOpen) {
+      setShowMyQr(false);
+      setExitDialogOpen(false);
+      setExchangeUndoDialogOpen(false);
+      lastScannedCodeRef.current = null;
+    }
     onOpenChange(nextOpen);
   };
 
@@ -112,45 +133,63 @@ export function TradeDrawer({
       const controller = new AbortController();
       scanAbortRef.current = controller;
 
-      const parsed = await parseScannedTradeQr(value, controller.signal);
+      const parsed = await parseExchangeQrPayload(value, controller.signal);
 
       if (controller.signal.aborted) return;
       scanAbortRef.current = null;
 
       if (!parsed.ok) {
         setScanErrorKey(parsed.errorKey);
+        toast.error(t(locale, "toast.scan.invalid"));
         return;
       }
+
+      if (lastScannedCodeRef.current === value) {
+        toast.warning(t(locale, "toast.scan.duplicate"));
+        return;
+      }
+      lastScannedCodeRef.current = value;
 
       const matches = buildTradeMatches({
         localMissingIds: getLocalMissingIds(collectionByStickerId),
         localDuplicateIds: getLocalDuplicateIds(collectionByStickerId),
-        remoteMissingIds: parsed.missingIds,
-        remoteDuplicateIds: parsed.duplicateIds,
+        remoteMissingIds: parsed.payload.missingIds,
+        remoteDuplicateIds: parsed.payload.duplicateIds,
       });
 
-      setResult({
-        remoteName: parsed.name || "",
+      setTradeResult({
+        remoteName: parsed.payload.name || "",
         receiveIds: matches.receiveIds,
         giveIds: matches.giveIds,
       });
-      setSelectedReceiveIds([]);
-      setSelectedGiveIds([]);
       setScanErrorKey(null);
       setApplyErrorKey(null);
       setStep("result");
+      toast.success(t(locale, "toast.scan.success"));
     },
-    [collectionByStickerId],
+    [collectionByStickerId, locale, setTradeResult],
   );
 
   const toggleReceive = (id: string) => {
     setApplyErrorKey(null);
-    setSelectedReceiveIds((ids) => toggleId(ids, id));
+    toggleReceiveId(id);
   };
 
   const toggleGive = (id: string) => {
     setApplyErrorKey(null);
-    setSelectedGiveIds((ids) => toggleId(ids, id));
+    toggleGiveId(id);
+  };
+
+  const toggleAllReceive = () => {
+    if (!result) return;
+    setApplyErrorKey(null);
+    toggleAllReceiveIds(result.receiveIds);
+  };
+
+  const toggleAllGive = () => {
+    if (!result) return;
+    setApplyErrorKey(null);
+    toggleAllGiveIds(result.giveIds);
   };
 
   const impact = useMemo(
@@ -171,8 +210,10 @@ export function TradeDrawer({
     give: selectedGiveIds.length,
   });
   const remoteName = result?.remoteName || t(locale, "trade.collectorFallback");
+  const activeStep = result ? "result" : step;
 
   const confirmTrade = () => {
+    const previousCollection = cloneCollection(collectionByStickerId);
     const tradeResult = applyTrade(selectedReceiveIds, selectedGiveIds);
 
     if (!tradeResult.ok) {
@@ -183,10 +224,39 @@ export function TradeDrawer({
             ? "trade.error.staleReceive"
             : "trade.error.invalidSelection",
       );
+      toast.error(t(locale, "toast.exchange.failed"));
       return;
     }
 
+    const expectedCurrentCollection = cloneCollection(
+      useStickerStore.getState().collectionByStickerId,
+    );
+
+    setPendingExchangeUndo({
+      beforeCollection: previousCollection,
+      expectedCurrentCollection,
+    });
+    toast.success(t(locale, "toast.exchange.completed"), {
+      action: {
+        label: t(locale, "toast.action.undo"),
+        onClick: () => {
+          setExchangeUndoDialogOpen(true);
+        },
+      },
+    });
+
+    clearTradeSession();
+    setStep("entry");
     handleOpenChange(false);
+  };
+
+  const discardTrade = () => {
+    clearTradeSession();
+    setApplyErrorKey(null);
+    setScanErrorKey(null);
+    setExitDialogOpen(false);
+    setStep("entry");
+    lastScannedCodeRef.current = null;
   };
 
   return (
@@ -197,7 +267,7 @@ export function TradeDrawer({
       bodyClassName="flex min-h-0 flex-1 flex-col p-0"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        {step === "entry" && (
+        {activeStep === "entry" && (
           <div className="space-y-5 px-5 pb-5 pt-4 text-center">
             <div>
               <Badge variant="secondary" className="mb-3 rounded-sm">
@@ -254,7 +324,7 @@ export function TradeDrawer({
           </div>
         )}
 
-        {step === "scan" && (
+        {activeStep === "scan" && (
           <div className="space-y-5 px-5 pb-5 pt-4">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
@@ -296,10 +366,20 @@ export function TradeDrawer({
           </div>
         )}
 
-        {step === "result" && result && (
+        {activeStep === "result" && result && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5 pt-4">
               <div className="flex items-start gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 -ml-2"
+                  onClick={() => setExitDialogOpen(true)}
+                  aria-label={t(locale, "trade.exit.dialogTitle")}
+                >
+                  <ArrowLeft className="size-5" />
+                </Button>
                 <div className="min-w-0 flex-1">
                   <DrawerHeader
                     title={t(locale, "trade.comparison.title")}
@@ -339,6 +419,7 @@ export function TradeDrawer({
                     stickerIds={result.receiveIds}
                     selectedIds={selectedReceiveIds}
                     onToggle={toggleReceive}
+                    onToggleAll={toggleAllReceive}
                   />
                   <TradeSection
                     title={t(locale, "trade.section.give.title", {
@@ -351,6 +432,7 @@ export function TradeDrawer({
                     stickerIds={result.giveIds}
                     selectedIds={selectedGiveIds}
                     onToggle={toggleGive}
+                    onToggleAll={toggleAllGive}
                   />
                 </>
               )}
@@ -369,7 +451,10 @@ export function TradeDrawer({
                   variant="secondary"
                   size="pill"
                   className="w-full shadow-none"
-                  onClick={() => setStep("scan")}
+                  onClick={() => {
+                    clearTradeSession();
+                    setStep("scan");
+                  }}
                 >
                   {t(locale, "trade.scanAnother")}
                 </Button>
@@ -514,14 +599,90 @@ export function TradeDrawer({
           </>
         )}
       </AnimatePresence>
+
+      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(locale, "trade.exit.dialogTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(locale, "trade.exit.dialogDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button type="button" variant="outline" className="shadow-none">
+                {t(locale, "common.cancel")}
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                className="shadow-none"
+                onClick={discardTrade}
+              >
+                {t(locale, "trade.exit.dialogConfirm")}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={exchangeUndoDialogOpen}
+        onOpenChange={setExchangeUndoDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(locale, "toast.exchange.undoTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingExchangeUndo &&
+              hasCollectionChangedSinceExpected({
+                currentCollection: collectionByStickerId,
+                expectedCurrentCollection: pendingExchangeUndo.expectedCurrentCollection,
+              })
+                ? t(locale, "toast.exchange.undoOverwriteDescription")
+                : t(locale, "toast.exchange.undoDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button type="button" variant="secondary" className="shadow-none">
+                {t(locale, "common.cancel")}
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                className="shadow-none"
+                onClick={() => {
+                  if (!pendingExchangeUndo) {
+                    setExchangeUndoDialogOpen(false);
+                    return;
+                  }
+
+                  try {
+                    setCollectionByStickerId(pendingExchangeUndo.beforeCollection);
+                    setPendingExchangeUndo(null);
+                    setExchangeUndoDialogOpen(false);
+                    toast.success(t(locale, "toast.exchange.reverted"));
+                  } catch {
+                    toast.error(t(locale, "toast.exchange.revertFailed"));
+                  }
+                }}
+              >
+                {t(locale, "toast.exchange.undoConfirm")}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppDrawer>
   );
-}
-
-function toggleId(ids: string[], id: string) {
-  return ids.includes(id)
-    ? ids.filter((candidate) => candidate !== id)
-    : [...ids, id];
 }
 
 type StickerOsIndexes = {
@@ -529,25 +690,8 @@ type StickerOsIndexes = {
   duplicateIndexes: number[];
 };
 
-type StickerOsDecodeResponse = {
-  format: "stickeros";
-  ownedIndexes: number[];
-  duplicateIndexes: number[];
-};
-
-type ParsedScannedTradeQr =
-  | {
-      ok: true;
-      name: string;
-      missingIds: string[];
-      duplicateIds: string[];
-    }
-  | {
-      ok: false;
-      errorKey: TradeMessageKey;
-    };
-
 export type TradeMessageKey =
+  | ExchangeQrMessageKey
   | "trade.error.invalidCollection"
   | "trade.error.invalidLength"
   | "trade.error.invalidHash"
@@ -592,88 +736,4 @@ export async function requestStickerOsQrEncode(
   if (!body.qr) throw new Error("StickerOS QR response did not include qr");
 
   return body.qr;
-}
-
-async function parseScannedTradeQr(
-  value: string,
-  signal?: AbortSignal,
-): Promise<ParsedScannedTradeQr> {
-  if (signal?.aborted) {
-    return { ok: false, errorKey: "trade.error.invalidQr" };
-  }
-
-  const stickerOs = await requestStickerOsQrDecode(value, signal);
-
-  if (signal?.aborted) {
-    return { ok: false, errorKey: "trade.error.invalidQr" };
-  }
-
-  if (stickerOs.ok) {
-    const owned = new Set(stickerOs.payload.ownedIndexes);
-
-    return {
-      ok: true,
-      name: "",
-      missingIds: stickers
-        .filter((sticker) => !owned.has(sticker.stickerOsIndex))
-        .map((sticker) => sticker.id),
-      duplicateIds: stickerOs.payload.duplicateIndexes
-        .map((index) => stickersByStickerOsIndex[index]?.id)
-        .filter((id): id is string => Boolean(id)),
-    };
-  }
-
-  const legacy = parseTradeQrPayload(value);
-
-  if (!legacy.ok) {
-    return { ok: false, errorKey: getTradeParseMessageKey(legacy.reason) };
-  }
-
-  return {
-    ok: true,
-    name: legacy.payload.name,
-    missingIds: legacy.payload.missingIds,
-    duplicateIds: legacy.payload.duplicateIds,
-  };
-}
-
-async function requestStickerOsQrDecode(
-  value: string,
-  signal?: AbortSignal,
-): Promise<
-  | { ok: true; payload: StickerOsDecodeResponse }
-  | { ok: false }
-> {
-  try {
-    const response = await fetch("/api/stickeros/qr", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "decode", qr: value }),
-      signal,
-    });
-
-    if (!response.ok) return { ok: false };
-
-    return {
-      ok: true,
-      payload: (await response.json()) as StickerOsDecodeResponse,
-    };
-  } catch {
-    return { ok: false };
-  }
-}
-
-function getTradeParseMessageKey(reason: TradeQrParseError): TradeMessageKey {
-  switch (reason) {
-    case "invalid-collection":
-    case "invalid-length":
-    case "invalid-hash":
-      return "trade.error.invalidCollection";
-    case "invalid-version":
-      return "trade.error.invalidVersion";
-    case "invalid-bitset":
-      return "trade.error.invalidBitset";
-    default:
-      return "trade.error.invalidQr";
-  }
 }

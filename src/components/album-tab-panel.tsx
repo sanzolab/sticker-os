@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { AnimatedTabPanel } from "@/components/ui/animated-tab-panel";
 import { TabSlider } from "@/components/ui/tab-slider";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -25,6 +25,11 @@ type StickerSectionViewModel = {
   duplicates: number;
 };
 
+type TabDef = {
+  id: AlbumTab;
+  label: ReactNode;
+};
+
 export function AlbumTabPanel({
   activeTabIndex,
   onTabChange,
@@ -33,6 +38,8 @@ export function AlbumTabPanel({
   query,
   sortMode,
   onEditDuplicates,
+  readOnly = false,
+  tabs: tabsProp,
 }: {
   activeTabIndex: number;
   onTabChange: (index: number) => void;
@@ -40,18 +47,27 @@ export function AlbumTabPanel({
   locale: Locale;
   query: string;
   sortMode: "grouped" | "az";
-  onEditDuplicates: (sticker: Sticker) => void;
+  onEditDuplicates?: (sticker: Sticker) => void;
+  readOnly?: boolean;
+  tabs?: readonly TabDef[];
 }) {
+  const tabs: readonly TabDef[] =
+    tabsProp ??
+    albumTabs.map((tab) => ({
+      id: tab.id,
+      label: t(locale, tab.labelKey),
+    }));
+
   return (
     <TabSlider
       activeIndex={activeTabIndex}
-      tabCount={4}
+      tabCount={tabs.length}
       onTabChange={onTabChange}
     >
-      {albumTabs.map(({ id: tab }, i) => (
+      {tabs.map(({ id: tabId }, i) => (
         <AlbumTabContent
-          key={tab}
-          tab={tab}
+          key={tabId}
+          tab={tabId}
           index={i}
           active={activeTabIndex === i}
           collectionByStickerId={collectionByStickerId}
@@ -59,6 +75,7 @@ export function AlbumTabPanel({
           query={query}
           sortMode={sortMode}
           onEditDuplicates={onEditDuplicates}
+          readOnly={readOnly}
         />
       ))}
     </TabSlider>
@@ -74,6 +91,7 @@ function AlbumTabContent({
   query,
   sortMode,
   onEditDuplicates,
+  readOnly,
 }: {
   tab: AlbumTab;
   index: number;
@@ -82,7 +100,8 @@ function AlbumTabContent({
   locale: Locale;
   query: string;
   sortMode: "grouped" | "az";
-  onEditDuplicates: (sticker: Sticker) => void;
+  onEditDuplicates?: (sticker: Sticker) => void;
+  readOnly: boolean;
 }) {
   const sections = useMemo(
     () =>
@@ -112,6 +131,7 @@ function AlbumTabContent({
           missing={missing}
           duplicates={duplicates}
           onEditDuplicates={onEditDuplicates}
+          collectionByStickerId={readOnly ? collectionByStickerId : undefined}
         />
       ))}
 
@@ -157,7 +177,8 @@ function buildStickerSections({
       activeTab === "all" ||
       (activeTab === "missing" && copies === 0) ||
       (activeTab === "duplicates" && copies > 1) ||
-      (activeTab === "special" && sticker.special);
+      (activeTab === "special" && sticker.special) ||
+      (activeTab === "collected" && copies > 0);
 
     if (!matchesTab) continue;
     if (
