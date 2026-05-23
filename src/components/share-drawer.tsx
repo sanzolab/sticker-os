@@ -16,25 +16,25 @@ import {
 } from "@/lib/export";
 import { t } from "@/lib/i18n";
 import {
-  MAX_SHARED_ALBUM_URL_LENGTH,
-  buildSharedAlbumLinkData,
-} from "@/lib/shared-album-link";
+  createShareLink,
+  type ShareLinkResult,
+} from "@/lib/share-album";
 import { useStickerStore } from "@/lib/store";
 import { copyText, downloadText } from "./export-actions";
 
-const SHARE_LINK_BUILD_TIMEOUT_MS = 1500;
+const SHARE_LINK_BUILD_TIMEOUT_MS = 15000;
 
 type ShareLinkState =
   | "idle"
   | "preparingSilent"
-  | "buildingVisible"
+  | "uploading"
   | "ready"
-  | "too-large"
+  | "empty"
   | "error";
 
 type ShareLinkBuildResult =
-  | { state: "ready"; url: string }
-  | { state: "too-large" }
+  | { state: "ready"; url: string; newRemoteId?: string; newRemoteSecret?: string }
+  | { state: "empty" }
   | { state: "error" };
 
 export function ShareDrawer({
@@ -58,6 +58,9 @@ export function ShareDrawer({
   );
   const backgroundBuildResultRef = useRef<ShareLinkBuildResult | null>(null);
   const locale = useStickerStore((state) => state.settings.locale);
+  const localShareId = useStickerStore((state) => state.localShareId);
+  const localShareSecret = useStickerStore((state) => state.localShareSecret);
+  const setLocalShareId = useStickerStore((state) => state.setLocalShareId);
 
   const getExportText = () =>
     buildTxtExportByKind(
@@ -102,27 +105,33 @@ export function ShareDrawer({
 
   const buildShareLink = useCallback(async (): Promise<ShareLinkBuildResult> => {
     try {
-      const data = await withTimeout(
-        buildSharedAlbumLinkData({
+      const result: ShareLinkResult = await withTimeout(
+        createShareLink({
           collectionByStickerId,
           senderName: collectionName,
+          localShareId,
+          localShareSecret,
         }),
         SHARE_LINK_BUILD_TIMEOUT_MS,
       );
 
-      const url = `${window.location.origin}/shared-album?data=${encodeURIComponent(data)}`;
-      if (url.length > MAX_SHARED_ALBUM_URL_LENGTH) {
-        return { state: "too-large" };
+      if (!result.ok) {
+        return { state: result.reason === "empty" ? "empty" : "error" };
       }
 
-      return { state: "ready", url };
+      return {
+        state: "ready",
+        url: result.url,
+        newRemoteId: result.kind === "remote" ? result.id : undefined,
+        newRemoteSecret: result.kind === "remote" ? result.secret : undefined,
+      };
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
-        console.error("buildShareLink failed:", error);
+        console.error("shareAlbumLink failed:", error);
       }
       return { state: "error" };
     }
-  }, [collectionByStickerId, collectionName]);
+  }, [collectionByStickerId, collectionName, localShareId, localShareSecret]);
 
   useEffect(() => {
     if (!open) {
@@ -157,8 +166,16 @@ export function ShareDrawer({
       backgroundBuildPromiseRef.current = null;
 
       if (result.state === "ready") {
+        if (result.newRemoteId && result.newRemoteSecret) {
+          setLocalShareId(result.newRemoteId, result.newRemoteSecret);
+        }
         setAlbumShareUrl(result.url);
         setLinkState("ready");
+        return;
+      }
+
+      if (result.state === "empty") {
+        setLinkState("empty");
         return;
       }
 
@@ -169,6 +186,8 @@ export function ShareDrawer({
     return () => {
       canceled = true;
     };
+    // setLocalShareId is a Zustand store action — stable reference, safe to omit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildShareLink, open]);
 
   const shareOrCopyUrl = useCallback(
@@ -211,14 +230,9 @@ export function ShareDrawer({
       return;
     }
 
-    const cachedResult = backgroundBuildResultRef.current;
-    if (cachedResult?.state === "too-large") {
-      setAlbumShareUrl("");
-      setLinkState("too-large");
-      return;
-    }
+    if (linkState === "empty") return;
 
-    setLinkState("buildingVisible");
+    setLinkState("uploading");
 
     const pendingBackgroundResult = backgroundBuildPromiseRef.current
       ? await backgroundBuildPromiseRef.current
@@ -226,12 +240,17 @@ export function ShareDrawer({
 
     const result =
       pendingBackgroundResult ??
-      (cachedResult?.state === "ready" ? cachedResult : await buildShareLink());
+      (backgroundBuildResultRef.current?.state === "ready"
+        ? backgroundBuildResultRef.current
+        : await buildShareLink());
 
     backgroundBuildResultRef.current = result;
     backgroundBuildPromiseRef.current = null;
 
     if (result.state === "ready") {
+      if (result.newRemoteId && result.newRemoteSecret) {
+        setLocalShareId(result.newRemoteId, result.newRemoteSecret);
+      }
       setAlbumShareUrl(result.url);
       setLinkState("ready");
       try {
@@ -315,9 +334,9 @@ export function ShareDrawer({
           </Button>
         </div>
 
-        {linkState === "too-large" ? (
-          <p className="rounded-sm border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-            {t(locale, "share.link.errorTooLong")}
+        {linkState === "empty" ? (
+          <p className="rounded-sm border border-muted-foreground/20 bg-muted/10 p-3 text-center text-xs text-muted-foreground">
+            {t(locale, "share.link.emptyAlbum")}
           </p>
         ) : null}
 
@@ -332,12 +351,12 @@ export function ShareDrawer({
           size="pill"
           className="w-full shadow-none"
           onClick={() => void shareAlbumLink()}
-          disabled={linkState === "buildingVisible"}
+          disabled={linkState === "uploading" || linkState === "empty"}
         >
-          {linkState === "buildingVisible" ? (
+          {linkState === "uploading" ? (
             <>
               <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              {t(locale, "share.link.preparing")}
+              {t(locale, "share.link.uploading")}
             </>
           ) : (
             <>

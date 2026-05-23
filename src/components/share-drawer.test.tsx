@@ -7,9 +7,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShareDrawer } from "./share-drawer";
 import { useStickerStore } from "@/lib/store";
 
-const buildSharedAlbumLinkDataMock = vi.fn();
+const createShareLinkMock = vi.fn();
 const copyTextMock = vi.fn();
 const downloadTextMock = vi.fn();
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabase: vi.fn(),
+}));
+
+vi.mock("@/lib/share-album", () => ({
+  createShareLink: (...args: unknown[]) => createShareLinkMock(...args),
+  getShareAbsoluteUrl: (id: string) =>
+    `https://sticker.os/shared-album/${id}`,
+  getShareUrl: (id: string) => `/shared-album/${id}`,
+}));
 
 vi.mock("@/components/ui/app-drawer", () => ({
   AppDrawer: ({
@@ -36,20 +47,26 @@ vi.mock("@/components/ui/drawer", () => ({
   ),
 }));
 
-vi.mock("@/lib/shared-album-link", () => ({
-  MAX_SHARED_ALBUM_URL_LENGTH: 1800,
-  buildSharedAlbumLinkData: (...args: unknown[]) =>
-    buildSharedAlbumLinkDataMock(...args),
-}));
-
 vi.mock("./export-actions", () => ({
   copyText: (...args: unknown[]) => copyTextMock(...args),
   downloadText: (...args: unknown[]) => downloadTextMock(...args),
 }));
 
+function successResult(url: string, overrides?: Partial<{ id: string; secret: string }>) {
+  if (overrides?.id) {
+    return {
+      ok: true,
+      url,
+      kind: "remote",
+      ...overrides,
+    };
+  }
+  return { ok: true, url, kind: "inline" };
+}
+
 beforeEach(() => {
   cleanup();
-  buildSharedAlbumLinkDataMock.mockReset();
+  createShareLinkMock.mockReset();
   copyTextMock.mockReset();
   downloadTextMock.mockReset();
   useStickerStore.setState((state) => ({
@@ -59,6 +76,8 @@ beforeEach(() => {
       locale: "en",
       localeSource: "manual",
     },
+    localShareId: undefined,
+    localShareSecret: undefined,
   }));
 });
 
@@ -69,7 +88,7 @@ afterEach(() => {
 
 describe("ShareDrawer album link", () => {
   it("keeps button label as Share album link when drawer opens", () => {
-    buildSharedAlbumLinkDataMock.mockReturnValue(new Promise(() => {}));
+    createShareLinkMock.mockReturnValue(new Promise(() => {}));
 
     renderDrawer();
 
@@ -78,31 +97,33 @@ describe("ShareDrawer album link", () => {
     });
     expect(shareLinkButton.getAttribute("disabled")).toBeNull();
     expect(
-      screen.queryByRole("button", { name: "Preparing link..." }),
+      screen.queryByRole("button", { name: "Uploading link..." }),
     ).toBeNull();
   });
 
-  it("shows Preparing link only during user-triggered action", async () => {
+  it("shows uploading state only during user-triggered action", async () => {
     const user = userEvent.setup();
     copyTextMock.mockResolvedValue(true);
 
-    let resolveBuild: (value: string) => void = () => {};
-    const pendingBuild = new Promise<string>((resolve) => {
+    let resolveBuild: (value: unknown) => void = () => {};
+    const pendingBuild = new Promise<unknown>((resolve) => {
       resolveBuild = resolve;
     });
-    buildSharedAlbumLinkDataMock.mockReturnValue(pendingBuild);
+    createShareLinkMock.mockReturnValue(pendingBuild);
 
     renderDrawer();
 
     const button = screen.getByRole("button", { name: "Share album link" });
     await user.click(button);
 
-    const preparingButton = await screen.findByRole("button", {
-      name: "Preparing link...",
+    const uploadingButton = await screen.findByRole("button", {
+      name: "Uploading link...",
     });
-    expect(preparingButton.getAttribute("disabled")).not.toBeNull();
+    expect(uploadingButton.getAttribute("disabled")).not.toBeNull();
 
-    resolveBuild("my-data");
+    resolveBuild(
+      successResult("https://sticker.os/shared-album/abc123abcd"),
+    );
 
     await screen.findByRole("button", { name: "Share album link" });
     expect(copyTextMock).toHaveBeenCalledTimes(1);
@@ -115,7 +136,9 @@ describe("ShareDrawer album link", () => {
       configurable: true,
       value: shareMock,
     });
-    buildSharedAlbumLinkDataMock.mockResolvedValue("my-data");
+    createShareLinkMock.mockResolvedValue(
+      successResult("https://sticker.os/shared-album/abc123abcd"),
+    );
 
     renderDrawer();
 
@@ -125,7 +148,9 @@ describe("ShareDrawer album link", () => {
     await user.click(button);
 
     expect(shareMock).toHaveBeenCalledTimes(1);
-    expect(shareMock.mock.calls[0]?.[0]?.url).toContain("/shared-album?data=");
+    expect(shareMock.mock.calls[0]?.[0]?.url).toContain(
+      "/shared-album/abc123abcd",
+    );
     expect(copyTextMock).not.toHaveBeenCalled();
   });
 
@@ -136,7 +161,9 @@ describe("ShareDrawer album link", () => {
       value: vi.fn().mockRejectedValue(new Error("blocked")),
     });
     copyTextMock.mockResolvedValue(true);
-    buildSharedAlbumLinkDataMock.mockResolvedValue("my-data");
+    createShareLinkMock.mockResolvedValue(
+      successResult("https://sticker.os/shared-album/abc123abcd"),
+    );
 
     renderDrawer();
 
@@ -155,7 +182,9 @@ describe("ShareDrawer album link", () => {
       value: undefined,
     });
     copyTextMock.mockResolvedValue(false);
-    buildSharedAlbumLinkDataMock.mockResolvedValue("my-data");
+    createShareLinkMock.mockResolvedValue(
+      successResult("https://sticker.os/shared-album/abc123abcd"),
+    );
 
     renderDrawer();
 
@@ -171,36 +200,13 @@ describe("ShareDrawer album link", () => {
     ).toBeTruthy();
     expect(screen.getByLabelText("Shared album link")).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: "Preparing link..." }),
+      screen.queryByRole("button", { name: "Uploading link..." }),
     ).toBeNull();
-  });
-
-  it("shows too-long error only after user taps share album link", async () => {
-    const user = userEvent.setup();
-    buildSharedAlbumLinkDataMock.mockResolvedValue("x".repeat(5000));
-
-    renderDrawer();
-
-    expect(
-      screen.queryByText(
-        "This album is too large to share as a link on this device.",
-      ),
-    ).toBeNull();
-
-    const button = await screen.findByRole("button", {
-      name: "Share album link",
-    });
-    await user.click(button);
-
-    await screen.findByText(
-      "This album is too large to share as a link on this device.",
-    );
-    expect(button.getAttribute("disabled")).toBeNull();
   });
 
   it("shows generic error and recovers from rejected generation", async () => {
     const user = userEvent.setup();
-    buildSharedAlbumLinkDataMock.mockRejectedValue(new Error("boom"));
+    createShareLinkMock.mockRejectedValue(new Error("boom"));
 
     renderDrawer();
 
@@ -217,9 +223,9 @@ describe("ShareDrawer album link", () => {
     ).toBeTruthy();
   });
 
-  it("shows generic error and recovers from timed-out generation", async () => {
+  it("shows generic error and recovers from timed-out generation", { timeout: 17000 }, async () => {
     const user = userEvent.setup();
-    buildSharedAlbumLinkDataMock.mockReturnValue(new Promise(() => {}));
+    createShareLinkMock.mockReturnValue(new Promise(() => {}));
 
     renderDrawer();
 
@@ -231,15 +237,49 @@ describe("ShareDrawer album link", () => {
     await screen.findByText(
       "Could not prepare the shared album link. Try reopening share options.",
       {},
-      { timeout: 3000 },
+      { timeout: 16000 },
     );
     await screen.findByRole("button", { name: "Share album link" });
+  });
+
+  it("shows empty album message when album has no stickers", async () => {
+    createShareLinkMock.mockResolvedValue({ ok: false, reason: "empty" });
+
+    renderDrawer();
+
+    await screen.findByText(
+      "Your album is empty. Add some stickers before sharing.",
+    );
+  });
+
+  it("persists local share id when new remote share is created", async () => {
+    const user = userEvent.setup();
+    copyTextMock.mockResolvedValue(true);
+    createShareLinkMock.mockResolvedValue(
+      successResult("https://sticker.os/shared-album/newId", {
+        id: "newId",
+        secret: "newSecret",
+      }),
+    );
+
+    renderDrawer();
+
+    const button = await screen.findByRole("button", {
+      name: "Share album link",
+    });
+    await user.click(button);
+
+    const state = useStickerStore.getState();
+    expect(state.localShareId).toBe("newId");
+    expect(state.localShareSecret).toBe("newSecret");
   });
 
   it("keeps TXT sharing behavior unchanged", async () => {
     const user = userEvent.setup();
     copyTextMock.mockResolvedValue(true);
-    buildSharedAlbumLinkDataMock.mockResolvedValue("my-data");
+    createShareLinkMock.mockResolvedValue(
+      successResult("https://sticker.os/shared-album/abc123abcd"),
+    );
 
     renderDrawer();
 
@@ -262,206 +302,3 @@ function renderDrawer() {
     />,
   );
 }
-
-describe("ShareDrawer album link integration with real buildSharedAlbumLinkData", () => {
-  beforeEach(() => {
-    copyTextMock.mockReset();
-  });
-
-  it("generates valid link with real data and shows manual fallback when clipboard fails", async () => {
-    const actual = await vi.importActual<
-      typeof import("@/lib/shared-album-link")
-    >("@/lib/shared-album-link");
-    buildSharedAlbumLinkDataMock.mockImplementation(
-      actual.buildSharedAlbumLinkData,
-    );
-
-    copyTextMock.mockResolvedValue(false);
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: undefined,
-    });
-
-    const stickersModule =
-      await vi.importActual<typeof import("@/lib/sticker-data")>(
-        "@/lib/sticker-data",
-      );
-    const collection: Record<string, number> = {};
-    for (let i = 0; i < 5; i += 1) {
-      collection[stickersModule.stickers[i].id] = 1;
-    }
-
-    render(
-      <ShareDrawer
-        open
-        onOpenChange={vi.fn()}
-        collectionName="IntegrationTest"
-        collectionByStickerId={collection}
-      />,
-    );
-
-    const user = userEvent.setup();
-    const button = await screen.findByRole("button", {
-      name: "Share album link",
-    });
-    await user.click(button);
-
-    // Should NOT show the generic prepare error
-    expect(
-      screen.queryByText(
-        "Could not prepare the shared album link. Try reopening share options.",
-      ),
-    ).toBeNull();
-
-    // Should show manual copy fallback
-    await screen.findByText(
-      "Automatic copy was blocked. You can copy this link manually.",
-    );
-    expect(screen.getByLabelText("Shared album link")).toBeTruthy();
-  });
-
-  it("does not show generic prepare error when link succeeds but share fails", async () => {
-    const actual = await vi.importActual<
-      typeof import("@/lib/shared-album-link")
-    >("@/lib/shared-album-link");
-    buildSharedAlbumLinkDataMock.mockImplementation(
-      actual.buildSharedAlbumLinkData,
-    );
-
-    const shareMock = vi.fn().mockRejectedValue(new Error("share blocked"));
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: shareMock,
-    });
-    copyTextMock.mockResolvedValue(false);
-
-    const stickersModule =
-      await vi.importActual<typeof import("@/lib/sticker-data")>(
-        "@/lib/sticker-data",
-      );
-    const collection: Record<string, number> = {};
-    for (let i = 0; i < 5; i += 1) {
-      collection[stickersModule.stickers[i].id] = 1;
-    }
-
-    render(
-      <ShareDrawer
-        open
-        onOpenChange={vi.fn()}
-        collectionName="IntegrationTest"
-        collectionByStickerId={collection}
-      />,
-    );
-
-    const user = userEvent.setup();
-    const button = await screen.findByRole("button", {
-      name: "Share album link",
-    });
-    await user.click(button);
-
-    // Native share was attempted with a valid URL
-    expect(shareMock).toHaveBeenCalledTimes(1);
-    const shareArg = shareMock.mock.calls[0]?.[0] as
-      | { url?: string }
-      | undefined;
-    expect(shareArg?.url).toContain("/shared-album?data=");
-
-    // Clipboard fallback was attempted
-    expect(copyTextMock).toHaveBeenCalledTimes(1);
-
-    // Should show manual fallback, NOT generic prepare error
-    expect(
-      screen.queryByText(
-        "Could not prepare the shared album link. Try reopening share options.",
-      ),
-    ).toBeNull();
-    await screen.findByText(
-      "Automatic copy was blocked. You can copy this link manually.",
-    );
-  });
-
-  it("shows generic prepare error only for actual payload generation failures", async () => {
-    const actual = await vi.importActual<
-      typeof import("@/lib/shared-album-link")
-    >("@/lib/shared-album-link");
-    buildSharedAlbumLinkDataMock.mockImplementation(
-      actual.buildSharedAlbumLinkData,
-    );
-
-    // Pass invalid collectionByStickerId to trigger a payload generation error
-    render(
-      <ShareDrawer
-        open
-        onOpenChange={vi.fn()}
-        collectionName="Test"
-        collectionByStickerId={null as unknown as Record<string, number>}
-      />,
-    );
-
-    const user = userEvent.setup();
-    const button = await screen.findByRole("button", {
-      name: "Share album link",
-    });
-    await user.click(button);
-
-    await screen.findByText(
-      "Could not prepare the shared album link. Try reopening share options.",
-    );
-  });
-
-  it("falls back to JSON payload when CompressionStream is unavailable", async () => {
-    const original = globalThis.CompressionStream;
-    delete (globalThis as Record<string, unknown>).CompressionStream;
-
-    const actual = await vi.importActual<
-      typeof import("@/lib/shared-album-link")
-    >("@/lib/shared-album-link");
-    buildSharedAlbumLinkDataMock.mockImplementation(
-      actual.buildSharedAlbumLinkData,
-    );
-
-    copyTextMock.mockResolvedValue(true);
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: undefined,
-    });
-
-    const stickersModule =
-      await vi.importActual<typeof import("@/lib/sticker-data")>(
-        "@/lib/sticker-data",
-      );
-    const collection: Record<string, number> = {};
-    collection[stickersModule.stickers[0].id] = 1;
-
-    render(
-      <ShareDrawer
-        open
-        onOpenChange={vi.fn()}
-        collectionName="Test"
-        collectionByStickerId={collection}
-      />,
-    );
-
-    const user = userEvent.setup();
-    const button = await screen.findByRole("button", {
-      name: "Share album link",
-    });
-    await user.click(button);
-
-    // Link was generated successfully (clipboard copy fired with a real URL)
-    expect(copyTextMock).toHaveBeenCalledTimes(1);
-    const copiedUrl = copyTextMock.mock.calls[0]?.[0] as string | undefined;
-    expect(copiedUrl).toContain("/shared-album?data=json.");
-
-    // No generic error
-    expect(
-      screen.queryByText(
-        "Could not prepare the shared album link. Try reopening share options.",
-      ),
-    ).toBeNull();
-
-    if (original) {
-      (globalThis as Record<string, unknown>).CompressionStream = original;
-    }
-  });
-});

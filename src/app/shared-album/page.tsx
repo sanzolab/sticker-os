@@ -1,13 +1,12 @@
 import { SharedAlbumPage } from "@/components/shared-album-page";
 
-type SharedAlbumPageProps = {
+type SharedAlbumLegacyRouteProps = {
   searchParams: Promise<{ data?: string }>;
 };
 
-export default async function SharedAlbumRoute({
+export default async function SharedAlbumLegacyRoute({
   searchParams,
-}: SharedAlbumPageProps) {
+}: SharedAlbumLegacyRouteProps) {
   const params = await searchParams;
   return <SharedAlbumPage data={params.data} />;
 }
-

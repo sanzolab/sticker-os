@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, ExternalLink, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -25,6 +25,10 @@ import {
   hasLocalAlbumProgress,
 } from "@/lib/shared-album-import";
 import { parseSharedAlbumLinkData, type SharedAlbumSnapshot } from "@/lib/shared-album-link";
+import {
+  fetchSharedAlbum,
+  type FetchSharedAlbumResult,
+} from "@/lib/share-album";
 import { useStickerStore } from "@/lib/store";
 import {
   cloneCollection,
@@ -47,7 +51,7 @@ type ViewMode =
   | "import-confirm"
   | "viewer";
 
-export function SharedAlbumPage({ data }: { data?: string }) {
+export function SharedAlbumPage({ data, shareId }: { data?: string; shareId?: string }) {
   const router = useRouter();
   const locale = useStickerStore((state) => state.settings.locale);
   const hasHydrated = useStickerStore((state) => state.hasHydrated);
@@ -62,9 +66,13 @@ export function SharedAlbumPage({ data }: { data?: string }) {
     | "sharedLink.error.invalidCollection"
     | "sharedLink.error.invalidVersion"
     | "sharedLink.error.invalidCompression"
+    | "sharedLink.error.notFound"
+    | "sharedLink.error.expired"
+    | "sharedLink.error.network"
     | null
   >(null);
   const [loading, setLoading] = useState(true);
+  const [isNetworkError, setIsNetworkError] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("actions");
   const [viewerTab, setViewerTab] = useState<AlbumTab>("all");
   const [viewerQuery, setViewerQuery] = useState("");
@@ -86,14 +94,47 @@ export function SharedAlbumPage({ data }: { data?: string }) {
   useEffect(() => {
     let canceled = false;
 
-    async function load() {
-      if (!data) {
+    async function loadFromShareId(id: string) {
+      setIsNetworkError(false);
+      if (!id) {
         setLoadErrorKey("sharedLink.error.invalid");
         setLoading(false);
         return;
       }
 
-      const parsed = await parseSharedAlbumLinkData(data);
+      const result: FetchSharedAlbumResult = await fetchSharedAlbum(id);
+      if (canceled) return;
+
+      if (result.ok) {
+        setSnapshot(result.snapshot);
+        setLoadErrorKey(null);
+        setLoading(false);
+        return;
+      }
+
+      if (result.reason === "network") {
+        setIsNetworkError(true);
+        setLoadErrorKey("sharedLink.error.network");
+      } else {
+        setLoadErrorKey(
+          result.reason === "expired"
+            ? "sharedLink.error.expired"
+            : result.reason === "invalid"
+              ? "sharedLink.error.invalid"
+              : "sharedLink.error.notFound",
+        );
+      }
+      setLoading(false);
+    }
+
+    async function loadFromLegacyData(d: string) {
+      if (!d) {
+        setLoadErrorKey("sharedLink.error.invalid");
+        setLoading(false);
+        return;
+      }
+
+      const parsed = await parseSharedAlbumLinkData(d);
       if (canceled) return;
 
       if (!parsed.ok) {
@@ -115,11 +156,16 @@ export function SharedAlbumPage({ data }: { data?: string }) {
       setLoading(false);
     }
 
-    void load();
+    if (shareId) {
+      void loadFromShareId(shareId);
+    } else {
+      void loadFromLegacyData(data ?? "");
+    }
+
     return () => {
       canceled = true;
     };
-  }, [data]);
+  }, [data, shareId]);
 
   const localHasProgress = useMemo(
     () => hasLocalAlbumProgress(localCollection),
@@ -197,7 +243,40 @@ export function SharedAlbumPage({ data }: { data?: string }) {
           description={t(locale, loadErrorKey ?? "sharedLink.error.invalid")}
           className="shadow-none"
         />
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex justify-center gap-2">
+          {isNetworkError && shareId ? (
+            <Button
+              variant="secondary"
+              size="pill"
+              onClick={() => {
+                setLoading(true);
+                setSnapshot(null);
+                setLoadErrorKey(null);
+                setIsNetworkError(false);
+                void fetchSharedAlbum(shareId).then((result) => {
+                  if (result.ok) {
+                    setSnapshot(result.snapshot);
+                    setLoadErrorKey(null);
+                  } else {
+                    setIsNetworkError(result.reason === "network");
+                    setLoadErrorKey(
+                      result.reason === "expired"
+                        ? "sharedLink.error.expired"
+                        : result.reason === "invalid"
+                          ? "sharedLink.error.invalid"
+                          : result.reason === "not-found"
+                            ? "sharedLink.error.notFound"
+                            : "sharedLink.error.network",
+                    );
+                  }
+                  setLoading(false);
+                });
+              }}
+            >
+              <RefreshCw className="size-4" />
+              {t(locale, "sharedLink.retry")}
+            </Button>
+          ) : null}
           <Button asChild variant="secondary" size="pill">
             <Link href="/">
               <ArrowLeft className="size-4" />

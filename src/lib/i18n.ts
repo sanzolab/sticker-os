@@ -92,6 +92,9 @@ const translations = {
     "share.link.title": "StickerOS shared album",
     "share.link.description": "Open this link in StickerOS to compare or import.",
     "share.link.preparing": "Preparing link...",
+    "share.link.uploading": "Uploading link...",
+    "share.link.emptyAlbum":
+      "Your album is empty. Add some stickers before sharing.",
     "share.link.errorTooLong":
       "This album is too large to share as a link on this device.",
     "share.link.errorGeneric":
@@ -235,6 +238,13 @@ const translations = {
       "This shared link was created by an unsupported version.",
     "sharedLink.error.invalidCompression":
       "This device cannot decode the shared link format.",
+    "sharedLink.error.notFound":
+      "This shared link was not found. The link may be invalid or the album was deleted.",
+    "sharedLink.error.expired":
+      "This shared album link has expired. Albums are available for 90 days after sharing.",
+    "sharedLink.error.network":
+      "Could not reach the server to load this shared album. Check your connection and try again.",
+    "sharedLink.retry": "Retry",
     "sharedLink.goHome": "Back to app",
     "sharedLink.snapshotBadge": "Shared snapshot",
     "sharedLink.title": "{name}'s shared album",
@@ -524,6 +534,9 @@ const translations = {
     "share.link.description":
       "Abre este enlace en StickerOS para comparar o importar.",
     "share.link.preparing": "Preparando enlace...",
+    "share.link.uploading": "Subiendo enlace...",
+    "share.link.emptyAlbum":
+      "Tu álbum está vacío. Agrega algunas figuritas antes de compartir.",
     "share.link.errorTooLong":
       "Este álbum es demasiado grande para compartirlo como enlace en este dispositivo.",
     "share.link.errorGeneric":
@@ -669,6 +682,13 @@ const translations = {
       "Este enlace compartido fue creado con una versión no compatible.",
     "sharedLink.error.invalidCompression":
       "Este dispositivo no puede decodificar el formato del enlace compartido.",
+    "sharedLink.error.notFound":
+      "No se encontró este enlace compartido. El enlace puede ser inválido o el álbum fue eliminado.",
+    "sharedLink.error.expired":
+      "Este enlace de álbum compartido ha expirado. Los álbumes están disponibles por 90 días después de compartirlos.",
+    "sharedLink.error.network":
+      "No se pudo conectar con el servidor para cargar este álbum compartido. Revisa tu conexión e intenta de nuevo.",
+    "sharedLink.retry": "Reintentar",
     "sharedLink.goHome": "Volver a la app",
     "sharedLink.snapshotBadge": "Instantánea compartida",
     "sharedLink.title": "Álbum compartido de {name}",

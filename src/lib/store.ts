@@ -72,6 +72,8 @@ type StickerOSState = {
   settings: Settings;
   searchQuery: string;
   hasHydrated: boolean;
+  localShareId?: string;
+  localShareSecret?: string;
 
   setHasHydrated: (value: boolean) => void;
   setSearchQuery: (query: string) => void;
@@ -83,6 +85,7 @@ type StickerOSState = {
   resetCollection: () => void;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   setLocalePreference: (locale: Locale, source: LocaleSource) => void;
+  setLocalShareId: (id: string, secret: string) => void;
 };
 
 export const useStickerStore = create<StickerOSState>()(
@@ -96,6 +99,8 @@ export const useStickerStore = create<StickerOSState>()(
       collectionByStickerId: starterCollection,
       settings: createDefaultSettings(),
       searchQuery: "",
+      localShareId: undefined,
+      localShareSecret: undefined,
 
       setSearchQuery: (searchQuery) => set({ searchQuery }),
 
@@ -167,6 +172,9 @@ export const useStickerStore = create<StickerOSState>()(
         set((state) => ({
           settings: { ...state.settings, locale, localeSource: source },
         })),
+
+      setLocalShareId: (id, secret) =>
+        set({ localShareId: id, localShareSecret: secret }),
     }),
     {
       name: STORAGE_KEY,
@@ -186,6 +194,16 @@ export const useStickerStore = create<StickerOSState>()(
             persisted?.settings,
             currentState.settings,
           ),
+          localShareId:
+            persisted?.localShareId &&
+            typeof persisted.localShareId === "string"
+              ? persisted.localShareId
+              : undefined,
+          localShareSecret:
+            persisted?.localShareSecret &&
+            typeof persisted.localShareSecret === "string"
+              ? persisted.localShareSecret
+              : undefined,
         };
       },
 
