@@ -14,6 +14,7 @@ import {
 } from "@/lib/sticker-quantity-toast";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
+import { useGuardedAction } from "@/hooks/use-guarded-action";
 
 export function DuplicateEditorContent({
   sticker,
@@ -29,6 +30,7 @@ export function DuplicateEditorContent({
   const setStickerCopies = useStickerStore((state) => state.setStickerCopies);
   const [draft, setDraft] = useState<number | null>(null);
   const duplicateDraft = draft ?? Math.max(copies - 1, 0);
+  const { guard } = useGuardedAction();
 
   return (
     <AppDrawer
@@ -75,7 +77,7 @@ export function DuplicateEditorContent({
       <Button
         size="pill"
         className="w-full"
-        onClick={() => {
+        onClick={guard(() => {
           const previousCopies = copies;
           const nextCopies = duplicateDraft + 1;
           setStickerCopies(sticker.id, nextCopies);
@@ -91,7 +93,7 @@ export function DuplicateEditorContent({
                 : undefined,
           }, STICKER_QUANTITY_SAVE_UNDO_TOAST_ID));
           onOpenChange(false);
-        }}
+        })}
       >
         {t(locale, "duplicate.confirm")}
       </Button>

@@ -12,6 +12,7 @@ import { OptionGroup } from "@/components/ui/option-group";
 import { localeOptions, t } from "@/lib/i18n";
 import { extractCacheNameFromServiceWorker, extractCacheVersion } from "@/lib/service-worker";
 import { useStickerStore, type ThemePreference } from "@/lib/store";
+import { useGuardedAction } from "@/hooks/use-guarded-action";
 import { stickerExportOptions, buildTxtExportByKind, getExportMeta, type ExportKind } from "@/lib/export";
 import {
   cloneCollection,
@@ -49,6 +50,7 @@ export function SettingsDrawer({
     null,
   );
   const [resetUndoDialogOpen, setResetUndoDialogOpen] = useState(false);
+  const { guard } = useGuardedAction();
 
   const getExportText = () =>
     buildTxtExportByKind(
@@ -270,7 +272,7 @@ export function SettingsDrawer({
                   <Button
                     variant="destructive"
                     className="shadow-none"
-                    onClick={() => {
+                    onClick={guard(() => {
                       const beforeCollection = cloneCollection(collectionByStickerId);
                       resetCollection();
                       const expectedCurrentCollection = cloneCollection(
@@ -298,13 +300,13 @@ export function SettingsDrawer({
                               return;
                             }
 
-                            setCollectionByStickerId(beforeCollection);
+                            setCollectionByStickerId(beforeCollection, { force: true, reason: "undo" });
                             setPendingResetUndo(null);
                             toast.success(t(locale, "toast.reset.reverted"));
                           },
                         },
                       });
-                    }}
+                    })}
                   >
                     {t(locale, "settings.reset.dialogConfirm")}
                   </Button>
@@ -347,9 +349,9 @@ export function SettingsDrawer({
                     return;
                   }
 
-                  try {
-                    setCollectionByStickerId(pendingResetUndo.beforeCollection);
-                    setPendingResetUndo(null);
+                    try {
+                      setCollectionByStickerId(pendingResetUndo.beforeCollection, { force: true, reason: "undo" });
+                      setPendingResetUndo(null);
                     toast.success(t(locale, "toast.reset.reverted"));
                   } catch {
                     toast.error(t(locale, "toast.reset.revertFailed"));

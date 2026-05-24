@@ -43,6 +43,7 @@ import {
 } from "@/lib/trade";
 import { toggleAllIds, toggleId } from "@/lib/trade-session";
 import { cn } from "@/lib/utils";
+import { useGuardedAction } from "@/hooks/use-guarded-action";
 
 type ViewMode =
   | "actions"
@@ -90,6 +91,7 @@ export function SharedAlbumPage({ data, shareId }: { data?: string; shareId?: st
   const [pendingExchangeUndo, setPendingExchangeUndo] = useState<CollectionSnapshotUndo | null>(
     null,
   );
+  const { guard } = useGuardedAction();
 
   useEffect(() => {
     let canceled = false;
@@ -460,7 +462,7 @@ export function SharedAlbumPage({ data, shareId }: { data?: string; shareId?: st
                 <AlertDialogAction asChild>
                   <Button
                     className="shadow-none"
-                    onClick={() => {
+                    onClick={guard(() => {
                       const previousCollection = cloneCollection(localCollection);
                       const result = applyTrade(selectedReceiveIds, selectedGiveIds);
                       if (!result.ok) {
@@ -495,7 +497,7 @@ export function SharedAlbumPage({ data, shareId }: { data?: string; shareId?: st
                       setSelectedGiveIds([]);
                       setExchangeErrorKey(null);
                       setViewMode("actions");
-                    }}
+                    })}
                   >
                     <Check className="size-4" />
                     {t(locale, "sharedLink.exchange.confirmAction")}
@@ -660,7 +662,7 @@ export function SharedAlbumPage({ data, shareId }: { data?: string; shareId?: st
                 <AlertDialogAction asChild>
                   <Button
                     onClick={() => {
-                      setCollectionByStickerId(importResultCollection);
+                      setCollectionByStickerId(importResultCollection, { force: true, reason: "import" });
                       sessionStorage.setItem("stickeros-import-success", "1");
                       router.push("/");
                     }}
@@ -732,7 +734,7 @@ export function SharedAlbumPage({ data, shareId }: { data?: string; shareId?: st
                   }
 
                   try {
-                    setCollectionByStickerId(pendingExchangeUndo.beforeCollection);
+                    setCollectionByStickerId(pendingExchangeUndo.beforeCollection, { force: true, reason: "undo" });
                     setPendingExchangeUndo(null);
                     setExchangeUndoDialogOpen(false);
                     toast.success(t(locale, "toast.exchange.reverted"));

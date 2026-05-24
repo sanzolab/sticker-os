@@ -12,6 +12,7 @@ import {
 } from "@/lib/image-upload";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
+import { useGuardedAction } from "@/hooks/use-guarded-action";
 import { useAssistantStore } from "@/lib/assistant-store";
 import { AddStickersCaptureOptions } from "./add-stickers-capture-options";
 import { AddStickersConfirmFooter } from "./add-stickers-confirm-footer";
@@ -63,6 +64,7 @@ export function AddStickersDrawer({
   const clearPending = useAddStickersPendingStore((state) => state.clearPending);
   const confirmAndConsume = useAddStickersPendingStore((state) => state.confirmAndConsume);
   const hasPending = hasPendingItems({ candidates, unresolved, albumAnalyses });
+  const { guard } = useGuardedAction();
   const pendingCount = candidates.length;
   const mode: AddStickersMode = isLoading
     ? "loading"
@@ -241,7 +243,7 @@ export function AddStickersDrawer({
     };
   }, [analyzeFile, consumeQueuedPhotoCapture, open, queuedPhotoCapture]);
 
-  const confirmAdd = () => {
+  const confirmAdd = guard(() => {
     const selectedCandidates = confirmAndConsume();
     selectedCandidates.forEach((candidate) => tapSticker(candidate.stickerId));
     if (selectedCandidates.length > 0) {
@@ -251,7 +253,7 @@ export function AddStickersDrawer({
     }
     setModeOverride("capture");
     handleOpenChange(false);
-  };
+  });
 
   const captureMore = () => {
     setModeOverride("capture");

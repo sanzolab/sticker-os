@@ -9,7 +9,7 @@ export type TradeMatches = {
 
 export type ApplyTradeResult =
   | { ok: true }
-  | { ok: false; reason: "stale-duplicates" | "stale-receive" | "invalid-selection" };
+  | { ok: false; reason: "stale-duplicates" | "stale-receive" | "invalid-selection" | "locked" };
 
 type ApplyTradeFailure = Extract<ApplyTradeResult, { ok: false }>;
 

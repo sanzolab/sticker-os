@@ -20,6 +20,8 @@ const translations = {
     "common.english": "English",
     "common.spanish": "Spanish",
     "topbar.addStickersAria": "Add stickers",
+    "topbar.lockAria": "Lock collection editing",
+    "topbar.unlockAria": "Unlock collection editing",
     "topbar.shareAria": "Open share options",
     "topbar.tradeAria": "Open sticker trade",
     "topbar.tradeBadge.pendingCount": "Pending trade: {count} selected",
@@ -459,6 +461,8 @@ const translations = {
     "common.english": "Inglés",
     "common.spanish": "Español",
     "topbar.addStickersAria": "Agregar figuritas",
+    "topbar.lockAria": "Bloquear edición de la colección",
+    "topbar.unlockAria": "Desbloquear edición de la colección",
     "topbar.shareAria": "Abrir opciones para compartir",
     "topbar.tradeAria": "Abrir intercambio de figuritas",
     "topbar.tradeBadge.pendingCount":

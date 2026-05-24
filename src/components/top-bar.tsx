@@ -3,6 +3,7 @@
 import { useRef, type CSSProperties, type RefObject } from "react";
 import { Plus, Repeat2, Settings, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LockButton } from "@/components/lock-button";
 import {
   SCROLL_CHROME_TRANSITION,
   useDiscreteChromeHidden,
@@ -94,6 +95,7 @@ export function TopBar({
               </span>
             )}
           </Button>
+          <LockButton />
           <Button
             variant="ghost"
             size="icon"

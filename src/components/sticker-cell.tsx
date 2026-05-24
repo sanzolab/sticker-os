@@ -14,6 +14,7 @@ import {
 } from "@/lib/sticker-quantity-toast";
 import { useStickerStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { useGuardedAction } from "@/hooks/use-guarded-action";
 
 const stickerCodeToken = "__STICKER_CODE__";
 
@@ -198,6 +199,7 @@ export const StickerCell = memo(function StickerCell({
   const locale = useStickerStore((state) => state.settings.locale);
   const [highlighted, setHighlighted] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { guard } = useGuardedAction();
 
   useEffect(
     () => () => {
@@ -221,7 +223,7 @@ export const StickerCell = memo(function StickerCell({
       copies={copies}
       animations={animations}
       highlighted={highlighted}
-      onTap={() => {
+      onTap={guard(() => {
         if (haptics) haptic("light");
         const previousCopies = copies;
         const compactCode = getCompactStickerCode(sticker);
@@ -243,38 +245,41 @@ export const StickerCell = memo(function StickerCell({
             },
           }, STICKER_QUANTITY_ADD_UNDO_TOAST_ID),
         );
-      }}
+      })}
       onLongPress={() => {
-        if (haptics) haptic("medium");
         if (copies === 1) {
-          const previousCopies = copies;
-          const compactCode = getCompactStickerCode(sticker);
-          removeSticker(sticker.id);
-          highlightSticker();
-          toast(
-            renderStickerToastTitle(
-              locale,
-              "toast.sticker.removed",
-              compactCode,
-              "remove",
-            ),
-            withStickerQuantityUndoToast({
-              className:
-                "border-red-500/25 bg-red-50 text-red-950 dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-100",
-              classNames: {
-                actionButton:
-                  "rounded-full bg-red-700 text-white hover:bg-red-700/90 dark:bg-red-500 dark:hover:bg-red-500/90",
-              },
-              action: {
-                label: t(locale, "toast.action.undo"),
-                onClick: () => {
-                  setStickerCopies(sticker.id, previousCopies);
+          guard(() => {
+            if (haptics) haptic("medium");
+            const previousCopies = copies;
+            const compactCode = getCompactStickerCode(sticker);
+            removeSticker(sticker.id);
+            highlightSticker();
+            toast(
+              renderStickerToastTitle(
+                locale,
+                "toast.sticker.removed",
+                compactCode,
+                "remove",
+              ),
+              withStickerQuantityUndoToast({
+                className:
+                  "border-red-500/25 bg-red-50 text-red-950 dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-100",
+                classNames: {
+                  actionButton:
+                    "rounded-full bg-red-700 text-white hover:bg-red-700/90 dark:bg-red-500 dark:hover:bg-red-500/90",
                 },
-              },
-            }, STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID),
-          );
+                action: {
+                  label: t(locale, "toast.action.undo"),
+                  onClick: () => {
+                    setStickerCopies(sticker.id, previousCopies);
+                  },
+                },
+              }, STICKER_QUANTITY_REMOVE_UNDO_TOAST_ID),
+            );
+          })();
+        } else if (copies > 1) {
+          onEditDuplicates(sticker);
         }
-        if (copies > 1) onEditDuplicates(sticker);
       }}
     />
   );

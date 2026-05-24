@@ -27,6 +27,11 @@ export type Settings = {
   localeSource: LocaleSource;
 };
 
+export type SetCollectionOptions = {
+  force?: boolean;
+  reason?: "undo" | "hydration" | "migration" | "import";
+};
+
 const STORAGE_KEY = "stickeros-collection-v1";
 
 const FALLBACK_LOCALE_SOURCE: LocaleSource = "auto";
@@ -74,15 +79,19 @@ type StickerOSState = {
   hasHydrated: boolean;
   localShareId?: string;
   localShareSecret?: string;
+  isLocked: boolean;
+  lastBlockedAttemptAt: number | null;
 
   setHasHydrated: (value: boolean) => void;
   setSearchQuery: (query: string) => void;
-  tapSticker: (id: string) => void;
-  removeSticker: (id: string) => void;
-  setStickerCopies: (id: string, copies: number) => void;
-  setCollectionByStickerId: (collectionByStickerId: Record<string, number>) => void;
+  toggleLock: () => void;
+  triggerBlockedFeedback: () => void;
+  tapSticker: (id: string) => boolean;
+  removeSticker: (id: string) => boolean;
+  setStickerCopies: (id: string, copies: number) => boolean;
+  setCollectionByStickerId: (collectionByStickerId: Record<string, number>, options?: SetCollectionOptions) => boolean;
   applyTrade: (receiveIds: string[], giveIds: string[]) => ApplyTradeResult;
-  resetCollection: () => void;
+  resetCollection: () => boolean;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   setLocalePreference: (locale: Locale, source: LocaleSource) => void;
   setLocalShareId: (id: string, secret: string) => void;
@@ -90,7 +99,7 @@ type StickerOSState = {
 
 export const useStickerStore = create<StickerOSState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       hasHydrated: false,
       setHasHydrated: (value) => set({ hasHydrated: value }),
 
@@ -101,44 +110,80 @@ export const useStickerStore = create<StickerOSState>()(
       searchQuery: "",
       localShareId: undefined,
       localShareSecret: undefined,
+      isLocked: false,
+      lastBlockedAttemptAt: null,
 
       setSearchQuery: (searchQuery) => set({ searchQuery }),
 
-      tapSticker: (id) =>
+      toggleLock: () => set((state) => ({ isLocked: !state.isLocked })),
+
+      triggerBlockedFeedback: () =>
+        set({ lastBlockedAttemptAt: Date.now() }),
+
+      tapSticker: (id) => {
+        if (get().isLocked) {
+          get().triggerBlockedFeedback();
+          return false;
+        }
         set((state) => {
           const next = { ...state.collectionByStickerId };
           next[id] = (next[id] ?? 0) + 1;
           return { collectionByStickerId: next };
-        }),
+        });
+        return true;
+      },
 
-      removeSticker: (id) =>
+      removeSticker: (id) => {
+        if (get().isLocked) {
+          get().triggerBlockedFeedback();
+          return false;
+        }
         set((state) => {
           const next = { ...state.collectionByStickerId };
           delete next[id];
           return { collectionByStickerId: next };
-        }),
+        });
+        return true;
+      },
 
-      setStickerCopies: (id, copies) =>
+      setStickerCopies: (id, copies) => {
+        if (get().isLocked) {
+          get().triggerBlockedFeedback();
+          return false;
+        }
         set((state) => {
           const next = { ...state.collectionByStickerId };
           if (copies <= 0) delete next[id];
           else next[id] = copies;
           return { collectionByStickerId: next };
-        }),
+        });
+        return true;
+      },
 
-      setCollectionByStickerId: (collectionByStickerId) =>
+      setCollectionByStickerId: (collectionByStickerId, options?) => {
+        if (get().isLocked && !options?.force) {
+          get().triggerBlockedFeedback();
+          return false;
+        }
         set((state) => ({
           collectionByStickerId: sanitizeCollection(
             collectionByStickerId,
             state.collectionByStickerId,
           ),
-        })),
+        }));
+        return true;
+      },
 
       applyTrade: (receiveIds, giveIds) => {
         let tradeResult: ApplyTradeResult = {
           ok: false,
           reason: "invalid-selection",
         };
+
+        if (get().isLocked) {
+          get().triggerBlockedFeedback();
+          return { ok: false, reason: "locked" };
+        }
 
         set((state) => {
           tradeResult = canApplyTrade(
@@ -161,7 +206,14 @@ export const useStickerStore = create<StickerOSState>()(
         return tradeResult;
       },
 
-      resetCollection: () => set({ collectionByStickerId: {} }),
+      resetCollection: () => {
+        if (get().isLocked) {
+          get().triggerBlockedFeedback();
+          return false;
+        }
+        set({ collectionByStickerId: {} });
+        return true;
+      },
 
       updateSetting: (key, value) =>
         set((state) => ({
@@ -186,6 +238,9 @@ export const useStickerStore = create<StickerOSState>()(
         return {
           ...currentState,
           ...persisted,
+          isLocked: typeof persisted?.isLocked === "boolean"
+            ? persisted.isLocked
+            : currentState.isLocked,
           collectionByStickerId: sanitizeCollection(
             persisted?.collectionByStickerId,
             currentState.collectionByStickerId,

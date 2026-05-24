@@ -34,6 +34,7 @@ import {
   sanitizeTradeDisplayName,
 } from "@/lib/trade-qr";
 import { t } from "@/lib/i18n";
+import { useGuardedAction } from "@/hooks/use-guarded-action";
 import { TradeScanner } from "./trade-scanner";
 import { DrawerHeader } from "./drawer-header";
 import { TradeSection } from "./trade-section";
@@ -87,6 +88,7 @@ export function TradeDrawer({
     (state) => state.toggleAllGiveIds,
   );
   const clearTradeSession = useTradeSessionStore((state) => state.clearSession);
+  const { guard } = useGuardedAction();
 
   const displayName = sanitizeTradeDisplayName(collectionName);
   const stickerOsIndexes = useMemo(
@@ -212,7 +214,8 @@ export function TradeDrawer({
   const remoteName = result?.remoteName || t(locale, "trade.collectorFallback");
   const activeStep = result ? "result" : step;
 
-  const confirmTrade = () => {
+  // eslint-disable-next-line react-hooks/refs
+  const confirmTrade = guard(() => {
     const previousCollection = cloneCollection(collectionByStickerId);
     const tradeResult = applyTrade(selectedReceiveIds, selectedGiveIds);
 
@@ -248,7 +251,7 @@ export function TradeDrawer({
     clearTradeSession();
     setStep("entry");
     handleOpenChange(false);
-  };
+  });
 
   const discardTrade = () => {
     clearTradeSession();
@@ -666,7 +669,7 @@ export function TradeDrawer({
                   }
 
                   try {
-                    setCollectionByStickerId(pendingExchangeUndo.beforeCollection);
+                    setCollectionByStickerId(pendingExchangeUndo.beforeCollection, { force: true, reason: "undo" });
                     setPendingExchangeUndo(null);
                     setExchangeUndoDialogOpen(false);
                     toast.success(t(locale, "toast.exchange.reverted"));

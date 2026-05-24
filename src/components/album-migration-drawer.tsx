@@ -90,7 +90,7 @@ export function AlbumMigrationDrawer({
 
   const applyMigration = useCallback(() => {
     if (!migrationResult) return;
-    setCollectionByStickerId(migrationResult.collectionByStickerId);
+    setCollectionByStickerId(migrationResult.collectionByStickerId, { force: true, reason: "migration" });
     toast.success(t(locale, "toast.migration.completed"));
     handleOpenChange(false);
   }, [handleOpenChange, locale, migrationResult, setCollectionByStickerId]);
