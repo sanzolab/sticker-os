@@ -34,16 +34,17 @@ describe("Toaster", () => {
         swipeDirections: ["top", "right", "bottom", "left"],
         closeButton: true,
         richColors: true,
-        toastOptions: {
-          classNames: {
-            toast: "rounded-sm border bg-card text-card-foreground shadow-lg",
-            description: "text-muted-foreground",
-            actionButton:
-              "rounded-full bg-primary text-primary-foreground hover:bg-primary/90",
-            cancelButton:
-              "rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80",
-          },
-        },
+         toastOptions: {
+           classNames: {
+             toast: "rounded-sm border bg-card text-card-foreground shadow-lg max-md:!py-2.5 max-md:!px-3",
+             description: "text-muted-foreground max-md:leading-snug",
+             actionButton:
+               "rounded-full bg-primary text-primary-foreground hover:bg-primary/90 max-md:h-7 max-md:px-2.5 max-md:text-xs",
+             cancelButton:
+               "rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 max-md:h-7 max-md:px-2.5 max-md:text-xs",
+             closeButton: "max-md:!hidden",
+           },
+         },
       }),
     );
   });

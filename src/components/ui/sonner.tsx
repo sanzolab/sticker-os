@@ -16,12 +16,13 @@ export function Toaster(props: ToasterProps) {
       toastOptions={{
         classNames: {
           toast:
-            "rounded-sm border bg-card text-card-foreground shadow-lg",
-          description: "text-muted-foreground",
+            "rounded-sm border bg-card text-card-foreground shadow-lg max-md:!py-2.5 max-md:!px-3",
+          description: "text-muted-foreground max-md:leading-snug",
           actionButton:
-            "rounded-full bg-primary text-primary-foreground hover:bg-primary/90",
+            "rounded-full bg-primary text-primary-foreground hover:bg-primary/90 max-md:h-7 max-md:px-2.5 max-md:text-xs",
           cancelButton:
-            "rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80",
+            "rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 max-md:h-7 max-md:px-2.5 max-md:text-xs",
+          closeButton: "max-md:!hidden",
         },
       }}
       {...props}
