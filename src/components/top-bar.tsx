@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { Plus, Repeat2, Settings, Share2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LockButton } from "@/components/lock-button";
 import {
@@ -37,11 +38,58 @@ export function TopBar({
   const internalHeaderRef = useRef<HTMLElement | null>(null);
   const headerRef = rootRef ?? internalHeaderRef;
   const locale = useStickerStore((state) => state.settings.locale);
+  const isLocked = useStickerStore((state) => state.isLocked);
+  const lastBlockedAttemptAt = useStickerStore(
+    (state) => state.lastBlockedAttemptAt,
+  );
   const clampedProgress = Math.min(1, Math.max(0, hiddenProgress));
   const isChromeHidden = useDiscreteChromeHidden({
     hiddenProgress: clampedProgress,
     isStickyActive,
   });
+  const [isTemporarilyRevealed, setIsTemporarilyRevealed] = useState(false);
+  const isRevealedRef = useRef(false);
+  const lastHandledAtRef = useRef<number | null>(null);
+  // Effect 1: detect blocked attempt while header is hidden, trigger reveal
+  useEffect(() => {
+    if (!isLocked || !isChromeHidden || lastBlockedAttemptAt === null) return;
+    if (lastHandledAtRef.current === lastBlockedAttemptAt) return;
+    if (isRevealedRef.current) return;
+
+    lastHandledAtRef.current = lastBlockedAttemptAt;
+    isRevealedRef.current = true;
+
+    setIsTemporarilyRevealed(true);
+    toast.info(t(locale, "toast.lock.blocked"), { id: "locked-feedback" });
+  }, [isLocked, isChromeHidden, lastBlockedAttemptAt, locale]);
+
+  // Effect 2: clear reveal on next real scroll interaction
+  useEffect(() => {
+    if (!isTemporarilyRevealed) return;
+
+    const handleScroll = () => {
+      setIsTemporarilyRevealed(false);
+      isRevealedRef.current = false;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [isTemporarilyRevealed]);
+
+  // Effect 3: clear reveal when unlocking
+  useEffect(() => {
+    if (!isLocked && isTemporarilyRevealed) {
+      queueMicrotask(() => {
+        setIsTemporarilyRevealed(false);
+        isRevealedRef.current = false;
+      });
+    }
+  }, [isLocked, isTemporarilyRevealed]);
+
+  const shouldShowHeader = isTemporarilyRevealed || !isChromeHidden;
+
   const tradeBadgeDisplay = formatTradeBadgeDisplay(tradeBadgeValue);
   const tradeBadgeAriaLabel =
     tradeBadgeValue === "!"
@@ -52,16 +100,16 @@ export function TopBar({
 
   const headerStyle: CSSProperties = isStickyActive
     ? {
-        transform: isChromeHidden
-          ? "translate3d(0, -100%, 0)"
-          : "translate3d(0, 0, 0)",
+        transform: shouldShowHeader
+          ? "translate3d(0, 0, 0)"
+          : "translate3d(0, -100%, 0)",
         opacity: 1,
         transitionProperty: "transform",
         transitionDuration: SCROLL_CHROME_TRANSITION.duration,
         transitionTimingFunction: SCROLL_CHROME_TRANSITION.timingFunction,
-        transitionDelay: isChromeHidden
-          ? SCROLL_CHROME_TRANSITION.staggerDelay
-          : "0ms",
+        transitionDelay: shouldShowHeader
+          ? "0ms"
+          : SCROLL_CHROME_TRANSITION.staggerDelay,
         willChange: "transform",
       }
     : {
