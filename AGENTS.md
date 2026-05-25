@@ -8,14 +8,14 @@ Use the `@/*` path alias for imports from `src`.
 
 ## Build, Test, and Development Commands
 
-- `npm run dev`: start the local Next development server.
-- `npm run build`: create a production Next build.
-- `npm run lint`: run ESLint with Next core web vitals and TypeScript rules.
-- `npm run typecheck`: run `tsc --noEmit` with strict TypeScript settings.
-- `npm test`: run the Vitest test suite once.
-- `npx vitest run <path>`: run a single test file.
+- `pnpm run dev`: start the local Next development server.
+- `pnpm run build`: create a production Next build.
+- `pnpm run lint`: run ESLint with Next core web vitals and TypeScript rules.
+- `pnpm run typecheck`: run `tsc --noEmit` with strict TypeScript settings.
+- `pnpm test`: run the Vitest test suite once.
+- `pnpx vitest run <path>`: run a single test file.
 
-Run `npm install` after dependency changes. Both `package-lock.json` and `pnpm-lock.yaml` exist; prefer npm scripts unless the project standard is explicitly changed.
+Run `pnpm install` after dependency changes. Both `package-lock.json` and `pnpm-lock.yaml` exist; prefer pnpm scripts unless the project standard is explicitly changed.
 
 ## Toolchain & Architecture Notes
 
@@ -36,7 +36,7 @@ Keep UI styling consistent with the Tailwind utility approach and shared helpers
 
 Place tests near the code they cover using the `*.test.ts` suffix. Use descriptive `describe` blocks and short `it` statements that state the expected outcome. Add or update tests when changing trade logic, QR payload handling, exports, or other pure library behavior.
 
-Before opening a PR, run `npm test`, `npm run lint`, and `npm run typecheck`.
+Before opening a PR, run `pnpm test`, `pnpm run lint`, and `pnpm run typecheck`.
 
 ## Commit Guidelines
 
