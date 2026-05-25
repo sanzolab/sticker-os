@@ -97,12 +97,64 @@ describe("StickerOS QR decoding", () => {
     );
   });
 
-  it("rejects gzip blocks that decompress to the wrong size", () => {
+  it("rejects gzip blocks that decompress to an unsupported size", () => {
     const badBlock = gzipBase64(Buffer.from([0]));
 
     expect(getThrownCode(() => decodeStickerOsQr(`⋋~${badBlock};${badBlock}`))).toBe(
       "STICKEROS_INVALID_BLOCK_SIZE",
     );
+  });
+
+  it("rejects blocks that decompress to 124 bytes (not a supported sticker count)", () => {
+    const badBlock = gzipBase64(Buffer.alloc(124, 0));
+
+    expect(getThrownCode(() => decodeStickerOsQr(`⋋~${badBlock};${badBlock}`))).toBe(
+      "STICKEROS_INVALID_BLOCK_SIZE",
+    );
+  });
+});
+
+describe("StickerOS QR decoding — 980-sticker (without CC)", () => {
+  const WITHOUT_CC_QR =
+    "⋋~H4sIAAAAAAAAA/v18f3f/1Dw/j89AT8AArYtXHsAAAA=;H4sIAAAAAAAAA2NhY4ADAQa6AgDevdCnewAAAA==";
+
+  it("decodes a 980-sticker QR successfully", () => {
+    const decoded = decodeStickerOsQr(WITHOUT_CC_QR);
+
+    expect(decoded.totalStickers).toBe(980);
+    expect(decoded.block1).toHaveLength(123);
+    expect(decoded.block2).toHaveLength(123);
+  });
+
+  it("does not include CC sticker indexes in ownedIndexes", () => {
+    const decoded = decodeStickerOsQr(WITHOUT_CC_QR);
+
+    const ccIndexes = decoded.ownedIndexes.filter((i) => i >= 980);
+    expect(ccIndexes).toHaveLength(0);
+  });
+
+  it("does not include CC sticker indexes in duplicateIndexes", () => {
+    const decoded = decodeStickerOsQr(WITHOUT_CC_QR);
+
+    const ccIndexes = decoded.duplicateIndexes.filter((i) => i >= 980);
+    expect(ccIndexes).toHaveLength(0);
+  });
+
+  it("rejects a 980-sticker QR with non-zero trailing bits", () => {
+    const block = Buffer.alloc(123, 0xff);
+    block[block.length - 1] = 0xff;
+    const badBlock = gzipBase64(block);
+
+    const code = getThrownCode(() => decodeStickerOsQr(`⋋~${badBlock};${badBlock}`));
+    expect(code).toBe("STICKEROS_INVALID_BLOCK_SIZE");
+  });
+
+  it("rejects mismatched block sizes between block1 and block2", () => {
+    const block123 = gzipBase64(Buffer.alloc(123, 0));
+    const block125 = gzipBase64(Buffer.alloc(125, 0));
+
+    const code = getThrownCode(() => decodeStickerOsQr(`⋋~${block123};${block125}`));
+    expect(code).toBe("STICKEROS_INVALID_BLOCK_SIZE");
   });
 });
 

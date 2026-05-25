@@ -20,7 +20,7 @@ export type DecodedStickerOsQr = {
   format: "stickeros";
   raw: string;
   blockSize: typeof STICKEROS_BLOCK_SIZE;
-  totalStickers: typeof STICKEROS_TOTAL_STICKERS;
+  totalStickers: number;
   owned: StickerOsDecodedSticker[];
   duplicates: StickerOsDecodedSticker[];
   ownedIndexes: number[];
@@ -54,12 +54,24 @@ export function decodeStickerOsQr(qr: string): DecodedStickerOsQr {
   const [block1Base64, block2Base64] = parts;
   const block1 = decodeBlock(block1Base64, "Block 1");
   const block2 = decodeBlock(block2Base64, "Block 2");
+
+  if (block1.length !== block2.length) {
+    throw stickerOsError(
+      "STICKEROS_INVALID_BLOCK_SIZE",
+      "Both StickerOS QR blocks must have the same decompressed size.",
+    );
+  }
+
+  const totalStickers = inferTotalStickers(block1.length);
+  validateTrailingBits(block1, totalStickers, "Block 1");
+  validateTrailingBits(block2, totalStickers, "Block 2");
+
   const owned: StickerOsDecodedSticker[] = [];
   const duplicates: StickerOsDecodedSticker[] = [];
   const ownedIndexes: number[] = [];
   const duplicateIndexes: number[] = [];
 
-  for (let index = 0; index < STICKEROS_TOTAL_STICKERS; index += 1) {
+  for (let index = 0; index < totalStickers; index += 1) {
     const bitPosition = getBitPosition(index);
     const sticker = {
       ...indexToSticker(index),
@@ -86,7 +98,7 @@ export function decodeStickerOsQr(qr: string): DecodedStickerOsQr {
     format: "stickeros",
     raw,
     blockSize: STICKEROS_BLOCK_SIZE,
-    totalStickers: STICKEROS_TOTAL_STICKERS,
+    totalStickers,
     owned,
     duplicates,
     ownedIndexes,
@@ -154,16 +166,44 @@ function decodeBlock(value: string, label: string) {
     );
   }
 
-  if (decompressed.length !== STICKEROS_BLOCK_SIZE) {
-    throw stickerOsError(
-      "STICKEROS_INVALID_BLOCK_SIZE",
-      `${label} must decompress to exactly ${STICKEROS_BLOCK_SIZE} bytes.`,
-    );
-  }
-
   return decompressed;
 }
 
 function isValidBase64(value: string) {
   return value.length > 0 && value.length % 4 === 0 && BASE64_PATTERN.test(value);
+}
+
+const BLOCK_SIZE_TO_STICKER_COUNT: Record<number, number> = {
+  123: 980,
+  125: 994,
+};
+
+function inferTotalStickers(blockSize: number) {
+  const totalStickers = BLOCK_SIZE_TO_STICKER_COUNT[blockSize];
+
+  if (totalStickers === undefined) {
+    throw stickerOsError(
+      "STICKEROS_INVALID_BLOCK_SIZE",
+      `Decompressed block size ${blockSize} is not supported. Must be 123 or 125 bytes.`,
+    );
+  }
+
+  return totalStickers;
+}
+
+function validateTrailingBits(block: Uint8Array, totalStickers: number, label: string) {
+  const usedBitsInLastByte = totalStickers % 8;
+
+  if (usedBitsInLastByte === 0) return;
+
+  const lastByteIndex = Math.ceil(totalStickers / 8) - 1;
+  const lastByte = block[lastByteIndex] ?? 0;
+  const allowedMask = (1 << usedBitsInLastByte) - 1;
+
+  if ((lastByte & ~allowedMask) !== 0) {
+    throw stickerOsError(
+      "STICKEROS_INVALID_BLOCK_SIZE",
+      `${label} has non-zero trailing bits beyond sticker count ${totalStickers}.`,
+    );
+  }
 }

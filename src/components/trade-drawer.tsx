@@ -142,7 +142,7 @@ export function TradeDrawer({
 
       if (!parsed.ok) {
         setScanErrorKey(parsed.errorKey);
-        toast.error(t(locale, "toast.scan.invalid"));
+        toast.error(t(locale, "toast.scan.invalid"), { position: "top-center" });
         return;
       }
 

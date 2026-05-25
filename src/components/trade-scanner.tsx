@@ -40,10 +40,14 @@ export function TradeScanner({
 
         const scanner = new QrScanner(
           videoRef.current,
-          (result) => {
+          async (result) => {
             if (scannedRef.current) return;
             scannedRef.current = true;
-            onScan(result.data);
+            try {
+              await onScan(result.data);
+            } finally {
+              scannedRef.current = false;
+            }
           },
           {
             highlightScanRegion: true,
@@ -86,7 +90,7 @@ export function TradeScanner({
       const result = await QrScanner.scanImage(file, {
         returnDetailedScanResult: true,
       });
-      onScan(result.data);
+      await onScan(result.data);
     } catch {
       setStatus("error");
       setMessageKey("scanner.message.noQrFound");

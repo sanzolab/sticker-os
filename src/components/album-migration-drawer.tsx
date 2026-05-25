@@ -76,7 +76,7 @@ export function AlbumMigrationDrawer({
       if (!parsed.ok) {
         setScanError(true);
         setMigrationResult(null);
-        toast.error(t(locale, "migration.error.invalidQr"));
+        toast.error(t(locale, "migration.error.invalidQr"), { position: "top-center" });
         return;
       }
 

@@ -916,6 +916,14 @@ export const stickersByStickerOsIndex = Object.fromEntries(
   stickers.map((sticker) => [sticker.stickerOsIndex, sticker]),
 );
 
+export const OPTIONAL_CC_STICKER_COUNT = 14;
+export const FULL_STICKER_COUNT = stickers.length;
+export const CORE_STICKER_COUNT = FULL_STICKER_COUNT - OPTIONAL_CC_STICKER_COUNT;
+export const FULL_BITSET_BYTE_LENGTH = Math.ceil(FULL_STICKER_COUNT / 8);
+export const CORE_BITSET_BYTE_LENGTH = Math.ceil(CORE_STICKER_COUNT / 8);
+export const SUPPORTED_STICKER_COUNTS = [CORE_STICKER_COUNT, FULL_STICKER_COUNT] as const;
+export const SUPPORTED_BITSET_BYTE_LENGTHS = [CORE_BITSET_BYTE_LENGTH, FULL_BITSET_BYTE_LENGTH] as const;
+
 export const starterCollection: Record<string, number> = {};
 
 export function getStickerCopies(
