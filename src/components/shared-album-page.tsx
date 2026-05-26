@@ -295,7 +295,7 @@ export function SharedAlbumPage({ data, shareId }: { data?: string; shareId?: st
       <Card>
         <CardHeader className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="rounded-sm">
+            <Badge variant="muted" className="rounded-sm">
               {t(locale, "sharedLink.snapshotBadge")}
             </Badge>
             {snapshotDateLabel ? (

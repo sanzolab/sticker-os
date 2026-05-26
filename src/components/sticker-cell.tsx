@@ -18,6 +18,17 @@ import { useGuardedAction } from "@/hooks/use-guarded-action";
 
 const stickerCodeToken = "__STICKER_CODE__";
 
+const stickerTileClasses = {
+  missing:
+    "rounded-sm border border-dashed !border-muted-foreground/45 bg-transparent text-muted-foreground hover:border-muted-foreground/60 hover:bg-transparent dark:!border-white/35 dark:bg-transparent dark:text-muted-foreground dark:hover:!border-white/45 dark:hover:bg-transparent",
+  owned:
+    "rounded-sm border !border-border/75 bg-primary/[0.07] text-foreground hover:border-border hover:bg-primary/[0.09] dark:!border-primary/45 dark:bg-primary/15 dark:!hover:border-white/20 dark:hover:bg-primary/20",
+  specialMissing:
+    "rounded-sm border border-dashed !border-amber-500/55 bg-transparent text-amber-800 hover:!border-amber-500/65 hover:bg-transparent dark:!border-amber-300/35 dark:bg-transparent dark:text-amber-200 dark:hover:!border-amber-300/60 dark:hover:bg-transparent",
+  specialOwned:
+    "rounded-sm border !border-amber-500/60 bg-amber-300/30 text-amber-900 hover:!border-amber-500/70 hover:bg-amber-300/35 dark:!border-amber-300/55 dark:bg-amber-300/15 dark:text-amber-100 dark:hover:!border-amber-300/60 dark:hover:bg-amber-300/20",
+};
+
 function renderStickerToastTitle(
   locale: Locale,
   key: "toast.sticker.added" | "toast.sticker.removed",
@@ -43,7 +54,7 @@ function renderStickerToastTitle(
       <span
         data-testid="sticker-toast-code-chip"
         className={cn(
-          "mx-1 inline-flex items-center rounded-sm border px-1.5 py-0.5 font-semibold leading-none tabular-nums",
+          "mx-1 inline-flex items-center rounded-sm border px-1.5 py-0.5 font-semibold leading-none tabular-nums ",
           chipToneClasses,
         )}
       >
@@ -111,13 +122,13 @@ export const StickerTile = memo(function StickerTile({
     "transition-[background-color,border-color,color,transform]",
     interactive && animations && "active:scale-[0.97]",
     !sticker.special && state === "missing" &&
-      "rounded-sm border border-dashed border-muted/30 bg-transparent text-muted-foreground/40",
+      stickerTileClasses.missing,
     !sticker.special && state === "owned" &&
-      "rounded-sm border border-border/50 bg-primary/[0.06] text-foreground",
+      stickerTileClasses.owned,
     sticker.special && state === "missing" &&
-      "rounded-sm border border-dashed !border-amber-300/60 bg-amber-50/15 text-amber-700/45 hover:!border-amber-300/80 hover:bg-amber-50/25 dark:!border-amber-500/30 dark:bg-transparent dark:text-muted-foreground/40 dark:hover:!border-amber-500/30 dark:hover:bg-transparent",
+      stickerTileClasses.specialMissing,
     sticker.special && state === "owned" &&
-      "rounded-sm border !border-amber-300/80 bg-amber-100/70 text-amber-700 hover:!border-amber-400/80 hover:bg-amber-100/85 dark:!border-amber-400/40 dark:bg-amber-950/20 dark:text-amber-300 dark:hover:!border-amber-400/40 dark:hover:bg-amber-950/20",
+      stickerTileClasses.specialOwned,
     highlighted &&
       "ring-2 ring-sky-500/70 ring-offset-1 ring-offset-background !border-sky-500/45 bg-sky-500/10 text-foreground dark:ring-sky-400/70 dark:!border-sky-400/50 dark:bg-sky-500/20",
   );
@@ -136,17 +147,17 @@ export const StickerTile = memo(function StickerTile({
         />
       )}
 
-      <span>{sticker.number}</span>
+      <span >{sticker.number}</span>
 
       {state === "missing" && !sticker.special && (
-        <span className="absolute bottom-[6px] md:bottom-2 size-1.5 rounded-full border" />
+        <span className="absolute bottom-[5px] md:bottom-2 size-1.5 rounded-full border border-muted-foreground/50 bg-background shadow-[0_0_0_1px_var(--background)] dark:!border-white/45 dark:bg-background" />
       )}
       {state === "missing" && sticker.special && (
-        <SpecialStickerMark className="absolute bottom-[6px] md:bottom-1.5 size-2.5 text-amber-300/60 dark:text-amber-500/30" />
+        <SpecialStickerMark className="absolute bottom-[5px] md:bottom-1.5 size-2 text-amber-600/75 dark:text-amber-300/80" />
       )}
 
       {copies > 1 && (
-        <span className="absolute right-0 top-0 translate-x-1/3 -translate-y-1/3 flex min-w-5 w-5 h-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+        <span className="absolute right-0 top-0 flex h-5 min-w-5 w-5 translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full border border-background bg-primary text-xs font-semibold text-primary-foreground shadow-sm ring-1 ring-primary/25 dark:border-background dark:ring-white/20">
           {copies - 1}
         </span>
       )}
@@ -164,7 +175,7 @@ export const StickerTile = memo(function StickerTile({
   }
 
   return (
-    <div className="relative aspect-square p-1.5">
+    <div className="relative aspect-square p-1.5 text-sm">
       <button
         type="button"
         onPointerDown={beginPress}

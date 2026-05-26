@@ -41,7 +41,7 @@ export function DuplicateEditorContent({
         onOpenChange(nextOpen);
       }}
     >
-      <Badge variant="secondary" className="mb-3 rounded-sm">
+      <Badge variant="muted" className="mb-3 rounded-sm">
         {sticker.code}
       </Badge>
       <DrawerTitle className="text-lg font-semibold">

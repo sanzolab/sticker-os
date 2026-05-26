@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { t } from "@/lib/i18n";
 import { useStickerStore } from "@/lib/store";
@@ -40,14 +41,21 @@ export function AddStickersReviewList({
   return (
     <div className="space-y-5">
       {albumAnalyses.length > 0 && (
-        <section className="space-y-3 rounded-sm border border-dashed p-3">
+        <section className="space-y-3 rounded-sm border border-dashed border-muted-foreground/30 bg-muted/20 p-3 dark:border-white/20 dark:bg-white/10">
           {albumAnalyses.map((analysis, index) => (
             <div key={`${analysis.methodology}-${analysis.group ?? "unknown"}-${index}`} className="space-y-2">
-              <h3 className="text-sm font-semibold">
-                {t(locale, "addStickers.review.album.missing")}
-                {": "}
-                {formatInventoryCodes(analysis.faltantes)}
-              </h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold">
+                  {t(locale, "addStickers.review.album.missing")}
+                  {": "}
+                  {formatInventoryCodes(analysis.faltantes)}
+                </h3>
+                {analysis.status === "needs_review" && (
+                  <Badge variant="warning" className="rounded-sm">
+                    {t(locale, "addStickers.unresolved.title")}
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {t(locale, "addStickers.review.album.present")}
                 {": "}
@@ -57,7 +65,7 @@ export function AddStickersReviewList({
                 {t(locale, "addStickers.review.album.method")}
               </p>
               {analysis.status === "needs_review" && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
                   {t(locale, "addStickers.review.album.needsReview")}
                 </p>
               )}

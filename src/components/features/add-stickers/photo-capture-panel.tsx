@@ -439,7 +439,7 @@ export function PhotoCapturePanel() {
               <>
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5">
                   <div>
-                    <Badge variant="secondary" className="mb-3 rounded-sm">
+                    <Badge variant="pending" className="mb-3 rounded-sm">
                       {t(locale, "addStickers.badge")}
                     </Badge>
                     <h3 className="text-lg font-semibold">

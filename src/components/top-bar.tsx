@@ -138,7 +138,7 @@ export function TopBar({
           >
             <Plus className="size-5" />
             {pendingAddStickersCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+              <span className="absolute -right-0.5 -top-0.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full border border-background bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground shadow-sm ring-1 ring-primary/25 dark:ring-white/20">
                 {pendingAddStickersCount}
               </span>
             )}
@@ -163,7 +163,7 @@ export function TopBar({
             <Repeat2 className="size-5" />
             {tradeBadgeDisplay && (
               <span
-                className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground ring-2 ring-background"
+                className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground shadow-sm ring-1 ring-primary/25 dark:ring-white/20"
                 aria-label={tradeBadgeAriaLabel}
               >
                 {tradeBadgeDisplay}

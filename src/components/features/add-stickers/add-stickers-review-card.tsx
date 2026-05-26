@@ -17,6 +17,9 @@ export function AddStickersReviewCard({
   onToggle: () => void;
 }) {
   const locale = useStickerStore((state) => state.settings.locale);
+  const confidence = Math.round(candidate.confidence * 100);
+  const confidenceVariant =
+    confidence >= 85 ? "success" : confidence >= 65 ? "pending" : "warning";
 
   return (
     <button
@@ -31,14 +34,14 @@ export function AddStickersReviewCard({
       className={cn(
         "grid grid-cols-[3.75rem_1fr] gap-3 rounded-sm border p-3 text-left transition-colors",
         selected
-          ? "border-primary/35 bg-primary/15"
-          : "border-dashed bg-background text-muted-foreground",
+          ? "border-primary/40 bg-primary/15"
+          : "border-dashed border-muted-foreground/35 bg-muted/25 text-muted-foreground dark:border-white/20 dark:bg-white/10",
       )}
     >
-      <span className="relative flex aspect-[3/4.35] items-center justify-center rounded-sm border bg-background text-xl font-semibold">
+      <span className="relative flex aspect-[3/4.35] items-center justify-center rounded-sm border border-border/80 bg-background text-xl font-semibold text-foreground">
         {candidate.number}
         {selected && (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-primary p-0.5 text-primary-foreground">
+          <span className="absolute right-1.5 top-1.5 rounded-full border border-background bg-primary p-0.5 text-primary-foreground shadow-sm">
             <Check className="size-3" />
           </span>
         )}
@@ -52,7 +55,7 @@ export function AddStickersReviewCard({
             aria-hidden="true"
             className={cn(
               "inline-flex size-4 items-center justify-center rounded-[3px] border",
-              selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background",
+              selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/35 bg-background",
             )}
           >
             {selected && <Check className="size-3" />}
@@ -66,8 +69,8 @@ export function AddStickersReviewCard({
             source: candidate.source,
           })}
         </span>
-        <Badge variant="secondary" className="rounded-sm">
-          {Math.round(candidate.confidence * 100)}%
+        <Badge variant={confidenceVariant} className="rounded-sm">
+          {confidence}%
         </Badge>
       </span>
     </button>

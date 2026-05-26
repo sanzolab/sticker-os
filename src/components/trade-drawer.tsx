@@ -273,7 +273,7 @@ export function TradeDrawer({
         {activeStep === "entry" && (
           <div className="space-y-5 px-5 pb-5 pt-4 text-center">
             <div>
-              <Badge variant="secondary" className="mb-3 rounded-sm">
+              <Badge variant="muted" className="mb-3 rounded-sm">
                 {displayName || "StickerOS"}
               </Badge>
               <DrawerTitle className="text-lg font-semibold">

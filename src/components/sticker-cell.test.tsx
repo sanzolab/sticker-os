@@ -43,13 +43,19 @@ describe("StickerTile", () => {
   });
 
   describe("visual states", () => {
-    it("renders missing state with dashed border and muted text", () => {
+    it("renders missing state as transparent with readable muted text", () => {
       const { container } = render(
         <StickerTile sticker={sticker} copies={0} interactive={false} />,
       );
       const tile = container.querySelector("[class*='border-dashed']");
-      expect(tile?.className).toContain("text-muted-foreground/40");
-      expect(tile?.className).not.toContain("text-amber-700/45");
+      expect(tile?.className).toContain("border-muted-foreground/45");
+      expect(tile?.className).toContain("bg-transparent");
+      expect(tile?.className).toContain("text-muted-foreground");
+      expect(tile?.className).toContain("hover:bg-transparent");
+      expect(tile?.className).toContain("dark:bg-transparent");
+      expect(tile?.className).not.toContain("bg-muted/");
+      expect(tile?.className).not.toContain("bg-white/");
+      expect(tile?.className).not.toContain("text-muted-foreground/40");
     });
 
     it("renders owned state with solid border and foreground text", () => {
@@ -58,7 +64,7 @@ describe("StickerTile", () => {
       );
       const tile = container.querySelector("[class*='bg-primary']");
       expect(tile?.className).toContain("text-foreground");
-      expect(tile?.className).not.toContain("bg-amber-100/70");
+      expect(tile?.className).not.toContain("bg-amber-300/30");
     });
 
     it("renders duplicate badge when copies > 1", () => {
@@ -90,13 +96,13 @@ describe("StickerTile", () => {
           interactive={false}
         />,
       );
-      const tile = container.querySelector("[class*='bg-amber-100']");
-      expect(tile?.className).toContain("!border-amber-300/80");
-      expect(tile?.className).toContain("bg-amber-100/70");
-      expect(tile?.className).toContain("text-amber-700");
-      expect(tile?.className).toContain("dark:!border-amber-400/40");
-      expect(tile?.className).toContain("dark:bg-amber-950/20");
-      expect(tile?.className).toContain("dark:text-amber-300");
+      const tile = container.querySelector("[class*='bg-amber-300']");
+      expect(tile?.className).toContain("!border-amber-500/55");
+      expect(tile?.className).toContain("bg-amber-300/30");
+      expect(tile?.className).toContain("text-amber-900");
+      expect(tile?.className).toContain("dark:!border-amber-300/45");
+      expect(tile?.className).toContain("dark:bg-amber-300/15");
+      expect(tile?.className).toContain("dark:text-amber-100");
     });
 
     it("renders special missing with amber dashed border", () => {
@@ -111,14 +117,20 @@ describe("StickerTile", () => {
         "[class*='border-dashed'][class*='amber']",
       );
       expect(tile).toBeTruthy();
-      expect(tile?.className).toContain("!border-amber-300/60");
-      expect(tile?.className).toContain("text-amber-700/45");
-      expect(tile?.className).toContain("dark:!border-amber-500/30");
-      expect(tile?.className).toContain("dark:text-muted-foreground/40");
+      expect(tile?.className).toContain("!border-amber-500/55");
+      expect(tile?.className).toContain("bg-transparent");
+      expect(tile?.className).toContain("text-amber-800");
+      expect(tile?.className).toContain("hover:bg-transparent");
+      expect(tile?.className).toContain("dark:bg-transparent");
+      expect(tile?.className).toContain("dark:!border-amber-300/45");
+      expect(tile?.className).toContain("dark:text-amber-200");
+      expect(tile?.className).not.toContain("bg-amber-");
+      expect(tile?.className).not.toContain("bg-white/");
+      expect(tile?.className).not.toContain("bg-muted/");
       const mark = container.querySelector("svg");
       const markClasses = mark?.getAttribute("class") ?? "";
-      expect(markClasses).toContain("text-amber-300/60");
-      expect(markClasses).toContain("dark:text-amber-500/30");
+      expect(markClasses).toContain("text-amber-600/75");
+      expect(markClasses).toContain("dark:text-amber-300/80");
     });
   });
 
